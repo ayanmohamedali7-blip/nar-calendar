@@ -75,7 +75,8 @@ function renderSummary() {
   let badge;
   if (med > 0) {
     const d = Math.round((100 * (v - med)) / med);
-    badge = Math.abs(d) < 15 ? '<span class="badge flat">● Close to normal</span>' : d > 0 ? `<span class="badge up">▲ ${d.toLocaleString('en-US')} % above normal</span>` : `<span class="badge down">▼ ${-d} % below normal</span>`;
+    // less than one cell-day away from normal is not an anomaly, whatever the percentage
+    badge = Math.abs(d) < 15 || Math.abs(v - med) < 1 ?'<span class="badge flat">● Close to normal</span>' : d > 0 ? `<span class="badge up">▲ ${d.toLocaleString('en-US')} % above normal</span>` : `<span class="badge down">▼ ${-d} % below normal</span>`;
   } else badge = v > 0 ? '<span class="badge up">▲ Fire in a month that is normally quiet</span>' : '<span class="badge flat">● Quiet, as normal</span>';
   h += `<div class="stat"><div class="k">${state.selMonth >= 0 ? 'Selected month' : 'Latest month on record'} · ${MONTHS_LONG[c]} ${2000 + Math.floor(m / 12)}</div>
     <div class="v">${fmt(v)} <small>burning cell-days${est ? ' (estimated)' : ''}</small></div>
@@ -133,7 +134,7 @@ function renderFunnelCard() {
   const t = { raw: 0, type0: 0, conf: 0, mask: 0, kept: 0 };
   for (const y of Object.values(P.funnel)) for (const s of Object.values(y)) for (const k in t) t[k] += s[k];
   const share = ((100 * t.kept) / t.raw).toFixed(1);
-  $('funnel-sub').textContent = `${P.country}, both sensors, 2000 to ${P.lastYear}: only ${share} % of ${t.raw.toLocaleString('en-US')} satellite hot spots are vegetation fires. Most of the rest are oil-field gas flares. Tick "Show removed gas flares" above the map to see them.`;
+  $('funnel-sub').textContent = `${P.country}, both sensors, 2000 to ${P.lastYear}: ${share} % of ${t.raw.toLocaleString('en-US')} satellite hot spots pass our fire filters. The rest are static heat sources such as gas flares and industry, and low-confidence detections. Tick "Show removed gas flares" above the map to see them.`;
   renderFunnel($('chart-funnel'), [
     { label: 'All satellite hot spots', value: t.raw, help: 'Every MODIS and VIIRS detection in the FIRMS archive.' },
     { label: 'Labelled vegetation fire', value: t.type0, help: 'FIRMS type 0. Types 1 to 3 are volcanoes, static land sources and offshore sources.' },

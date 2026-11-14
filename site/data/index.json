@@ -28,6 +28,78 @@
         { "name": "Kufra", "lat": 24.18, "lon": 23.29 },
         { "name": "Ghadames", "lat": 30.133, "lon": 9.5 }
       ]
+    },
+    {
+      "id": "algeria",
+      "name": "Algeria",
+      "file": "algeria.json",
+      "presets": [
+        { "id": "kabylie", "name": "Kabylie (Tizi Ouzou and Bejaia)", "box": [36.3, 3.6, 36.95, 5.4] },
+        { "id": "el-tarf-annaba", "name": "El Tarf and Annaba forests", "box": [36.3, 7.2, 37.1, 8.7] },
+        { "id": "jijel-skikda", "name": "Jijel and Skikda coast", "box": [36.5, 5.5, 37.1, 7.2] },
+        { "id": "tlemcen-oran", "name": "Tlemcen and Oran hills", "box": [34.6, -2.0, 35.8, 0.2] }
+      ],
+      "places": [
+        { "name": "Algiers", "lat": 36.754, "lon": 3.059 },
+        { "name": "Oran", "lat": 35.697, "lon": -0.633 },
+        { "name": "Constantine", "lat": 36.365, "lon": 6.615 },
+        { "name": "Annaba", "lat": 36.9, "lon": 7.767 },
+        { "name": "Tizi Ouzou", "lat": 36.712, "lon": 4.046 },
+        { "name": "Bejaia", "lat": 36.756, "lon": 5.084 },
+        { "name": "Jijel", "lat": 36.82, "lon": 5.767 },
+        { "name": "Skikda", "lat": 36.876, "lon": 6.909 },
+        { "name": "El Tarf", "lat": 36.767, "lon": 8.314 },
+        { "name": "Setif", "lat": 36.191, "lon": 5.414 },
+        { "name": "Batna", "lat": 35.556, "lon": 6.174 },
+        { "name": "Tlemcen", "lat": 34.878, "lon": -1.315 },
+        { "name": "Ghardaia", "lat": 32.49, "lon": 3.67 },
+        { "name": "Hassi Messaoud", "lat": 31.68, "lon": 6.07 }
+      ]
+    },
+    {
+      "id": "egypt",
+      "name": "Egypt",
+      "file": "egypt.json",
+      "presets": [
+        { "id": "nile-delta", "name": "Nile Delta", "box": [30.0, 29.8, 31.6, 32.3] },
+        { "id": "upper-egypt", "name": "Upper Egypt (Qena to Aswan)", "box": [24.0, 32.2, 27.0, 33.2] },
+        { "id": "faiyum", "name": "Faiyum", "box": [29.0, 30.3, 29.7, 31.2] }
+      ],
+      "places": [
+        { "name": "Cairo", "lat": 30.044, "lon": 31.236 },
+        { "name": "Alexandria", "lat": 31.2, "lon": 29.919 },
+        { "name": "Tanta", "lat": 30.786, "lon": 31.0 },
+        { "name": "Mansoura", "lat": 31.04, "lon": 31.378 },
+        { "name": "Port Said", "lat": 31.265, "lon": 32.302 },
+        { "name": "Suez", "lat": 29.967, "lon": 32.55 },
+        { "name": "Faiyum", "lat": 29.31, "lon": 30.842 },
+        { "name": "Asyut", "lat": 27.181, "lon": 31.184 },
+        { "name": "Qena", "lat": 26.164, "lon": 32.727 },
+        { "name": "Luxor", "lat": 25.687, "lon": 32.64 },
+        { "name": "Aswan", "lat": 24.089, "lon": 32.9 }
+      ]
+    },
+    {
+      "id": "tunisia",
+      "name": "Tunisia",
+      "file": "tunisia.json",
+      "presets": [
+        { "id": "kroumirie", "name": "Kroumirie forests (Jendouba)", "box": [36.4, 8.2, 37.1, 9.4] },
+        { "id": "cap-bon", "name": "Cap Bon and Zaghouan", "box": [36.2, 10.0, 37.1, 11.2] },
+        { "id": "kasserine", "name": "Kasserine and Jebel Chambi", "box": [34.9, 8.2, 35.6, 9.3] }
+      ],
+      "places": [
+        { "name": "Tunis", "lat": 36.806, "lon": 10.181 },
+        { "name": "Bizerte", "lat": 37.274, "lon": 9.874 },
+        { "name": "Tabarka", "lat": 36.954, "lon": 8.758 },
+        { "name": "Jendouba", "lat": 36.501, "lon": 8.78 },
+        { "name": "Sousse", "lat": 35.825, "lon": 10.637 },
+        { "name": "Kairouan", "lat": 35.678, "lon": 10.096 },
+        { "name": "Kasserine", "lat": 35.167, "lon": 8.836 },
+        { "name": "Sfax", "lat": 34.74, "lon": 10.76 },
+        { "name": "Gabes", "lat": 33.881, "lon": 10.098 },
+        { "name": "Tozeur", "lat": 33.92, "lon": 8.133 }
+      ]
     }
   ]
 }

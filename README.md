@@ -14,7 +14,9 @@ Draw any area on the map (or type its coordinates) and Nar Calendar shows:
 - how far the older, MODIS-based years can be **trusted**, measured rather than assumed;
 - **CSV downloads** of everything.
 
-The first country pack is **Libya**, where the story started: the forests of Jebel Akhdar (the Green Mountain).
+Country packs so far: **Libya**, where the story started (the forests of Jebel Akhdar, the Green Mountain), **Algeria**, **Egypt** and **Tunisia**. Any other country is two commands away (see "Run it").
+
+The record matches events people remember: the Kabylie fires of August 2021 and Algeria's 2012 season stand out, and so does the autumn rice-straw burning of the Nile Delta. Validation of yearly totals (each year hidden, then predicted from MODIS alone): Algeria misses by 7 %, the Nile Delta by 9 %, Libya by 16 %, Jebel Akhdar by 25 %.
 
 ## The problem
 
