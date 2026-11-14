@@ -154,7 +154,8 @@ function renderAll() {
   const { D, P, area } = state;
   renderSummary();
   const has = D.idx.length > 0;
-  for (const id of ['calendar-card']) $(id).style.display = has ? '' : 'none';
+  for (const id of ['calendar-card', 'ai-card']) $(id).style.display = has ? '' : 'none';
+  resetAI();
   document.querySelectorAll('main > .grid2').forEach((el) => { el.style.display = has ? '' : 'none'; });
   if (!has) return;
   const ml = (m) => `${MONTHS_LONG[m % 12]} ${2000 + Math.floor(m / 12)}`;
@@ -316,6 +317,117 @@ async function loadCountry(id, initial = {}) {
   renderLegend();
 }
 
+// ---------------------------------------------------------------- AI analyst
+// The model (worker/index.js -> Cloudflare Workers AI) only words the numbers below. If it is
+// not reachable, the same facts are turned into a plain automatic summary, so the card always
+// answers.
+const ai = { lang: 'en', busy: false };
+
+function buildFacts() {
+  const { D, P, area, country } = state;
+  const label = (m) => `${MONTHS_LONG[m % 12]} ${2000 + Math.floor(m / 12)}`;
+  const monthFacts = (m) => ({ month: label(m), cellDays: D.H[m], normalForThatMonth: D.clim.med[m % 12], rankFromTop: 1 + D.rankAbove[m], yearsCompared: D.clim.count[m % 12], estimatedFromMODIS: D.src[m] !== 'VIIRS', satelliteOutageDays: D.gapDays[m] });
+  const full = D.years.filter((y) => y.months === 12);
+  const byTotal = [...full].sort((p, q) => q.total - p.total);
+  const months = [];
+  for (let m = 0; m < D.N; m++) if (Number.isFinite(D.H[m]) && D.H[m] > 0) months.push(m);
+  months.sort((p, q) => D.H[q] - D.H[p]);
+  const season = seasonText([...D.clim.med]);
+  const t = { raw: 0, kept: 0 };
+  for (const y of Object.values(P.funnel)) for (const s of Object.values(y)) { t.raw += s.raw; t.kept += s.kept; }
+  const T = D.trend;
+  return {
+    area: area.name,
+    country: country.name,
+    years: `${D.range[0]} to ${D.range[1]}`,
+    unit: 'burning cell-days (one 1 km cell with fire on one day)',
+    latestMonth: monthFacts(D.lastM),
+    selectedMonth: state.selMonth >= 0 ? monthFacts(state.selMonth) : null,
+    fireSeason: season ? { months: season.range, peak: season.peak } : null,
+    normalByMonth: Object.fromEntries(MONTHS.map((n, c) => [n, D.clim.med[c]])),
+    mostActiveYears: byTotal.slice(0, 3).map((y) => ({ year: y.year, cellDays: y.total, estimatedFromMODIS: !y.observed })),
+    quietestYear: byTotal.length ? { year: byTotal[byTotal.length - 1].year, cellDays: byTotal[byTotal.length - 1].total } : null,
+    mostActiveMonths: months.slice(0, 5).map((m) => ({ month: label(m), cellDays: D.H[m] })),
+    yearlyTotals: Object.fromEntries(full.map((y) => ['y' + y.year, y.total])),
+    trend: T ? { direction: T.p < 0.05 ? (T.slope > 0 ? 'rising' : 'falling') : 'no clear trend', cellDaysPerYear: T.slope, pValue: T.p, completeYears: T.n } : null,
+    reliabilityOfYearsBefore2012: Number.isFinite(D.cv.yearlyError) && D.overlap.SV >= 30 ? { typicalMissOfAYearlyTotalPercent: Math.round(100 * D.cv.yearlyError), method: D.cv.method === 'ratio' ? 'monthly conversion factors' : 'rank matching' } : 'too few fires to measure',
+    shareOfCountryHotSpotsRemovedAsNotFirePercent: t.raw ? Math.round(1000 * (1 - t.kept / t.raw)) / 10 : null,
+    preliminary: D.lastM >= D.prelimFrom,
+  };
+}
+
+/** Plain summary made by code alone: shown when the AI model cannot be reached. */
+function automaticSummary(f, lang) {
+  const n = (v) => fmt(v);
+  const L = f.latestMonth;
+  const cmp = L.normalForThatMonth > 0 ? Math.round((100 * (L.cellDays - L.normalForThatMonth)) / L.normalForThatMonth) : null;
+  const top = f.mostActiveYears[0];
+  if (lang === 'ar') {
+    return [
+      `المنطقة: ${f.area}، ${f.country}، السنوات ${f.years}.`,
+      f.fireSeason ? `موسم الحرائق المعتاد: ${f.fireSeason.months}، والذروة في ${f.fireSeason.peak}.` : 'الحرائق نادرة هنا ولا يظهر موسم واضح.',
+      `آخر شهر (${L.month}): ${n(L.cellDays)} خلية-يوم محترقة، والمعتاد لهذا الشهر ${n(L.normalForThatMonth)}${cmp === null ? '' : cmp > 15 ? ` (أعلى من المعتاد بـ ${cmp}%)` : cmp < -15 ? ` (أقل من المعتاد بـ ${-cmp}%)` : ' (قريب من المعتاد)'}.`,
+      top ? `أكثر سنة نشاطا: ${top.year} بـ ${n(top.cellDays)} خلية-يوم${top.estimatedFromMODIS ? ' (تقدير من القمر القديم)' : ''}.` : '',
+      f.trend ? (f.trend.direction === 'no clear trend' ? 'لا يوجد اتجاه واضح على المدى الطويل.' : `الاتجاه على المدى الطويل: ${f.trend.direction === 'rising' ? 'في ارتفاع' : 'في انخفاض'}.`) : '',
+      typeof f.reliabilityOfYearsBefore2012 === 'object' ? `دقة السنوات قبل 2012: الخطأ المعتاد في المجموع السنوي حوالي ${f.reliabilityOfYearsBefore2012.typicalMissOfAYearlyTotalPercent}%.` : '',
+    ].filter(Boolean).join(' ');
+  }
+  return [
+    `${f.area}, ${f.country}, ${f.years}.`,
+    f.fireSeason ? `The usual fire season runs ${f.fireSeason.months}, with a peak in ${f.fireSeason.peak}.` : 'Fires are rare here and no clear season shows.',
+    `The latest month (${L.month}) had ${n(L.cellDays)} burning cell-days; a normal one has ${n(L.normalForThatMonth)}${cmp === null ? '' : cmp > 15 ? ` (${cmp} % above normal)` : cmp < -15 ? ` (${-cmp} % below normal)` : ' (close to normal)'}.`,
+    top ? `The most active year was ${top.year} with ${n(top.cellDays)} cell-days${top.estimatedFromMODIS ? ' (estimated from MODIS)' : ''}.` : '',
+    f.trend ? (f.trend.direction === 'no clear trend' ? 'There is no clear long-term trend.' : `The long-term trend is ${f.trend.direction}.`) : '',
+    typeof f.reliabilityOfYearsBefore2012 === 'object' ? `Years before 2012 are estimates with a typical miss of about ${f.reliabilityOfYearsBefore2012.typicalMissOfAYearlyTotalPercent} % for a yearly total.` : '',
+  ].filter(Boolean).join(' ');
+}
+
+function resetAI() {
+  const out = $('ai-out');
+  if (!out || ai.busy) return;
+  out.className = 'ai-out muted';
+  out.textContent = ai.lang === 'ar' ? 'اضغط "Explain this area" للحصول على شرح مبسط لهذه المنطقة.' : 'Press "Explain this area" for a plain-language briefing of the selected area and years.';
+}
+
+async function askAI(question = '') {
+  if (ai.busy || !state.D || !state.D.idx.length) return;
+  ai.busy = true;
+  const out = $('ai-out');
+  const facts = buildFacts();
+  $('ai-go').disabled = true;
+  out.className = 'ai-out muted';
+  out.textContent = ai.lang === 'ar' ? 'جاري التحليل…' : 'Reading the numbers…';
+  let text = '';
+  let source = '';
+  try {
+    const res = await fetch('api/brief', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ lang: ai.lang, question, facts }) });
+    const data = await res.json();
+    if (res.ok && data.text) { text = data.text; source = ai.lang === 'ar' ? 'نص مولّد بالذكاء الاصطناعي من أرقام هذه الصفحة' : 'AI-generated from the numbers on this page'; }
+  } catch { /* fall through to the automatic summary */ }
+  if (!text) {
+    text = automaticSummary(facts, ai.lang);
+    source = ai.lang === 'ar' ? 'ملخص آلي (نموذج الذكاء الاصطناعي غير متاح الآن)' : 'Automatic summary (the AI model is not reachable right now)';
+  }
+  out.className = 'ai-out';
+  out.textContent = text;
+  const tag = document.createElement('span');
+  tag.className = 'tagline';
+  tag.textContent = `${source} · ${facts.area}, ${facts.years}`;
+  out.appendChild(tag);
+  $('ai-go').disabled = false;
+  ai.busy = false;
+}
+
+function initAI() {
+  document.querySelectorAll('#ai-card .seg button').forEach((b) => b.addEventListener('click', () => {
+    ai.lang = b.dataset.lang;
+    document.querySelectorAll('#ai-card .seg button').forEach((x) => x.classList.toggle('on', x === b));
+    resetAI();
+  }));
+  $('ai-go').addEventListener('click', () => askAI());
+  $('ai-ask').addEventListener('submit', (ev) => { ev.preventDefault(); const q = $('ai-q').value.trim(); if (q) askAI(q); });
+}
+
 // ---------------------------------------------------------------- downloads
 function download(name, text) {
   const a = document.createElement('a');
@@ -453,14 +565,15 @@ async function main() {
     setArea({ type: 'box', box, name: 'Custom rectangle' });
   });
   $('chk-static').addEventListener('change', (ev) => { mapApi.setShowStatic(ev.target.checked); renderLegend(); });
-  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('#calendar-card .seg button').forEach((b) => b.addEventListener('click', () => {
     state.calMode = b.dataset.mode;
-    document.querySelectorAll('.seg button').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll('#calendar-card .seg button').forEach((x) => x.classList.toggle('on', x === b));
     renderCalendar($('calendar'), state.D, { mode: state.calMode, selMonth: state.selMonth });
   }));
   $('calendar').addEventListener('click', (ev) => { const c = ev.target.closest('.cell'); if (c) selectMonth(+c.dataset.m); });
   $('table-months').addEventListener('click', (ev) => { const r = ev.target.closest('tr[data-m]'); if (r) { selectMonth(+r.dataset.m); $('map').scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
   $('dl-monthly').addEventListener('click', () => download(`nar-calendar_${slug()}_monthly.csv`, monthlyCsv()));
+  initAI();
   $('y0').addEventListener('change', () => setRange(+$('y0').value, +$('y1').value));
   $('y1').addEventListener('change', () => setRange(+$('y0').value, +$('y1').value));
   $('dl-png').addEventListener('click', () => calendarPng());

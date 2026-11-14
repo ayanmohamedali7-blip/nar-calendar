@@ -1,9 +1,12 @@
 // Hosting: the static site in ./site is served by Cloudflare (Workers static assets).
+// worker/index.js adds one endpoint, /api/brief, which calls Cloudflare Workers AI.
 //   npx wrangler deploy
 {
   "name": "nar-calendar",
   "compatibility_date": "2026-11-01",
-  "assets": { "directory": "./site" },
+  "main": "worker/index.js",
+  "assets": { "directory": "./site", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  "ai": { "binding": "AI" },
   // public address; the default *.workers.dev address is switched off
   "routes": [{ "pattern": "nar.vorelq.com", "custom_domain": true }],
   "workers_dev": false,

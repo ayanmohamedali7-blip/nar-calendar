@@ -59,6 +59,28 @@
     <aside class="summary" id="summary" aria-live="polite"></aside>
   </section>
 
+  <section class="card ai" id="ai-card">
+    <div class="card-head">
+      <div>
+        <h2>AI fire analyst <span class="pill">AI</span></h2>
+        <p class="sub">An AI model reads the numbers this page computed for your area and explains them in plain language, in English or Arabic. It is given those numbers only.</p>
+      </div>
+      <div class="ai-controls">
+        <div class="seg" role="group" aria-label="Language of the briefing">
+          <button type="button" data-lang="en" class="on">English</button>
+          <button type="button" data-lang="ar" lang="ar">العربية</button>
+        </div>
+        <button type="button" class="primary" id="ai-go">Explain this area</button>
+      </div>
+    </div>
+    <div id="ai-out" class="ai-out" dir="auto" aria-live="polite"></div>
+    <form id="ai-ask" class="ai-ask">
+      <input id="ai-q" type="text" maxlength="200" dir="auto" placeholder="Ask about this area, for example: which months need the closest watch?" aria-label="Question for the AI analyst">
+      <button type="submit">Ask</button>
+    </form>
+    <p class="note" id="ai-note">AI-generated text can be wrong: the numbers and charts on this page are the reference. Open-weight language model running on Cloudflare Workers AI.</p>
+  </section>
+
   <section class="card" id="calendar-card">
     <div class="card-head">
       <div>
