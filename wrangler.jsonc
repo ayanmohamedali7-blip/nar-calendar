@@ -1,0 +1,11 @@
+// Hosting: the static site in ./site is served by Cloudflare (Workers static assets).
+//   npx wrangler deploy
+{
+  "name": "nar-calendar",
+  "compatibility_date": "2026-11-01",
+  "assets": { "directory": "./site" },
+  // public address; the default *.workers.dev address is switched off
+  "routes": [{ "pattern": "nar.vorelq.com", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}
