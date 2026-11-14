@@ -107,6 +107,68 @@ for (const r of kept) {
   if (r.frp > o.frp) o.frp = r.frp;
 }
 const list = [...recs.values()].sort((x, y) => x.d - y.d || x.a - y.a || x.b - y.b);
+
+// --- VIIRS on NOAA-20 (same instrument, the satellite that continues the record after Suomi NPP).
+// Kept as a separate list so that the MODIS / S-NPP record above stays exactly what it was.
+// Same rules as S-NPP: type 0 (or not yet labelled), not low confidence, not next to a static
+// source (those of MODIS / S-NPP plus NOAA-20's own), not in a persistent cell.
+let noaa20 = null;
+{
+  const rowsN = [];
+  let firstN = '', lastN = '', untypedN = null;
+  for (const f of fs.readdirSync(RAW).sort()) {
+    if (!/^viirs-noaa20_\d{4}_.*\.csv$/.test(f)) continue;
+    const lines = fs.readFileSync(path.join(RAW, f), 'utf8').split(/\r?\n/);
+    const head = lines[0].split(',');
+    const ix = Object.fromEntries(head.map((h, i) => [h, i]));
+    for (let i = 1; i < lines.length; i++) {
+      const c = lines[i].split(',');
+      if (c.length < head.length) continue;
+      const lat = +c[ix.latitude], lon = +c[ix.longitude];
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      const date = c[ix.acq_date];
+      if (!firstN || date < firstN) firstN = date;
+      if (date > lastN) lastN = date;
+      const untyped = ix.type === undefined || c[ix.type] === '';
+      if (untyped && (!untypedN || date < untypedN)) untypedN = date;
+      rowsN.push({ a: Math.floor(lat * RES), b: Math.floor(lon * RES), day: dayIndex(date), month: +date.slice(5, 7), type: untyped ? 0 : +c[ix.type], low: c[ix.confidence] === 'l' });
+    }
+  }
+  // a half-downloaded NOAA-20 record would give a wrong bridge: every year from 2018 to the last
+  // one must be on disk and marked complete by the download script
+  const lastY = +(throughArg || lastN || '0').slice(0, 4);
+  let complete = rowsN.length > 0;
+  for (let y = 2018; y <= lastY; y++) if (!fs.existsSync(path.join(RAW, `viirs-noaa20_${y}_${country}.csv.done`))) complete = false;
+  if (rowsN.length && !complete) console.log('NOAA-20 files are incomplete for', country, '- left out of the pack');
+  if (complete) {
+    const staticN = new Set(staticCells.keys());
+    for (const r of rowsN) if (r.type !== 0) staticN.add(K(r.a, r.b));
+    const near = (r) => { const d = DILATE.V; for (let i = -d; i <= d; i++) for (let j = -d; j <= d; j++) if (staticN.has(K(r.a + i, r.b + j))) return true; return false; };
+    let keptN = rowsN.filter((r) => r.type === 0 && !r.low && !near(r));
+    const cdN = new Map();
+    for (const r of keptN) { const k = K(r.a, r.b); let s = cdN.get(k); if (!s) cdN.set(k, s = { a: r.a, b: r.b, days: new Map() }); s.days.set(r.day, r.month); }
+    const persistentN = new Set();
+    for (const [k, c] of cdN) {
+      const days = new Set(), months = new Set();
+      for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+        const n = cdN.get(K(c.a + i, c.b + j)); if (!n) continue;
+        for (const [d, m] of n.days) { days.add(d); months.add(m); }
+      }
+      if (days.size >= PERSIST_DAYS && months.size >= PERSIST_MONTHS) persistentN.add(k);
+    }
+    keptN = keptN.filter((r) => !persistent.has(K(r.a, r.b)) && !persistentN.has(K(r.a, r.b)));
+    const uniq = new Map();
+    for (const r of keptN) uniq.set(r.day * 1e10 + K(r.a, r.b), r);
+    const listN = [...uniq.values()].sort((x, y) => x.day - y.day || x.a - y.a || x.b - y.b);
+    let p = 0;
+    noaa20 = {
+      source: 'NASA FIRMS API: VIIRS NOAA-20 375 m (standard product, then near-real-time)',
+      from: firstN, through: lastN, preliminaryFrom: untypedN,
+      raw: rowsN.length, n: listN.length,
+      dd: listN.map((o) => { const v = o.day - p; p = o.day; return v; }), a: listN.map((o) => o.a), b: listN.map((o) => o.b),
+    };
+  }
+}
 let prev = 0;
 const pack = {
   country,
@@ -127,6 +189,7 @@ const pack = {
   staticCells: [...staticCells.values()].map((s) => [s.a, s.b, s.n]),
   persistentCells: [...persistent.values()].map((s) => [s.a, s.b, s.n]),
 };
+if (noaa20) pack.noaa20 = noaa20;
 fs.mkdirSync(OUT, { recursive: true });
 const file = path.join(OUT, country.toLowerCase().replace(/[^a-z]+/g, '-') + '.json');
 fs.writeFileSync(file, JSON.stringify(pack));
@@ -137,4 +200,5 @@ console.log(country, 'detections funnel', JSON.stringify(tot));
 console.log('static cells', staticCells.size, 'persistent cells', persistent.size, 'cell-days', list.length,
   'MODIS', list.filter((o) => o.f & 3).length, 'VIIRS', list.filter((o) => o.f & 4).length, 'both', list.filter((o) => (o.f & 3) && (o.f & 4)).length);
 console.log('persistent sample', [...persistent.values()].sort((x, y) => y.n - x.n).slice(0, 8).map((p) => `${p.a / 100},${p.b / 100} d=${p.n} m=${p.months}`).join(' | '));
-console.log('wrote', file, (fs.statSync(file).size / 1024).toFixed(0) + ' KB');
+if (noaa20) console.log('NOAA-20', noaa20.from, 'to', noaa20.through, 'detections', noaa20.raw, 'cell-days', noaa20.n, 'near-real-time from', noaa20.preliminaryFrom);
+console.log('wrote', file,(fs.statSync(file).size / 1024).toFixed(0) + ' KB');

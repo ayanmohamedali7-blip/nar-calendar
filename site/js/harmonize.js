@@ -13,7 +13,9 @@ export const ERA = {
   TERRA_START: 10, // Nov 2000 (start of the MODIS/Terra active-fire archive)
   AQUA_START: 30, // Jul 2002 (Aqua fire data begins 4 Jul 2002)
   VIIRS_START: 145, // Feb 2012 (S-NPP VIIRS 375 m data begins 20 Jan 2012; January is partial)
+  NOAA20_START: 219, // Apr 2018 (NOAA-20 VIIRS 375 m fire data in FIRMS begin 1 Apr 2018)
 };
+export const NOAA20_FILL_DAYS = 3; // S-NPP outage days in a month from which NOAA-20 takes over that month
 export const PRIOR_STRENGTH = 20; // shrinkage weight of the ratio baseline, in MODIS cell-days
 export const SEASON_PRIOR = 2; // shrinkage of the season weights, in months
 export const MIN_COVERAGE = 1 / 3; // outage scaling never multiplies a count by more than 3
@@ -46,8 +48,8 @@ export function decodePack(pack) {
     nMonths = (t.getUTCFullYear() - 2000) * 12 + t.getUTCMonth() + (complete ? 1 : 0);
   }
   // Sensor outages (pipeline/find-gaps.mjs): share of the days of each month a sensor observed.
-  const coverage = { terra: new Float64Array(nMonths).fill(1), aqua: new Float64Array(nMonths).fill(1), viirs: new Float64Array(nMonths).fill(1) };
-  const missing = { terra: new Int16Array(nMonths), aqua: new Int16Array(nMonths), viirs: new Int16Array(nMonths) };
+  const coverage = { terra: new Float64Array(nMonths).fill(1), aqua: new Float64Array(nMonths).fill(1), viirs: new Float64Array(nMonths).fill(1), noaa20: new Float64Array(nMonths).fill(1) };
+  const missing = { terra: new Int16Array(nMonths), aqua: new Int16Array(nMonths), viirs: new Int16Array(nMonths), noaa20: new Int16Array(nMonths) };
   for (const s of Object.keys(coverage)) {
     for (const [from, to] of (pack.gaps && pack.gaps[s]) || []) {
       for (let t = Date.parse(from + 'T00:00:00Z'); t <= Date.parse(to + 'T00:00:00Z'); t += DAY_MS) {
@@ -63,7 +65,25 @@ export function decodePack(pack) {
   }
   // first month built from near-real-time detections (no FIRMS type label yet)
   const prelimFrom = pack.preliminaryFrom ? (+pack.preliminaryFrom.slice(0, 4) - 2000) * 12 + (+pack.preliminaryFrom.slice(5, 7) - 1) : Infinity;
-  return { ...pack, day, a, b, f, frp, mi, nMonths, lastYear, coverage, missing, prelimFrom };
+  // VIIRS on NOAA-20: a separate list of burning cell-days (day, cell). The days after the last
+  // complete month of the record are the month in progress ("tail").
+  let n20 = null;
+  if (pack.noaa20 && pack.noaa20.n) {
+    const q = pack.noaa20;
+    const nd = new Int32Array(q.n);
+    const nmi = new Int16Array(q.n);
+    let dn = 0;
+    for (let i = 0; i < q.n; i++) {
+      dn += q.dd[i];
+      nd[i] = dn;
+      const t = new Date(EPOCH + dn * DAY_MS);
+      nmi[i] = (t.getUTCFullYear() - 2000) * 12 + t.getUTCMonth();
+    }
+    const tailFrom = Math.round((Date.UTC(2000 + Math.floor(nMonths / 12), nMonths % 12, 1) - EPOCH) / DAY_MS);
+    const throughDay = Math.round((Date.parse(q.through + 'T00:00:00Z') - EPOCH) / DAY_MS);
+    n20 = { n: q.n, day: nd, mi: nmi, a: Int32Array.from(q.a), b: Int32Array.from(q.b), from: q.from, through: q.through, tailFrom, throughDay };
+  }
+  return { ...pack, day, a, b, f, frp, mi, nMonths, lastYear, coverage, missing, prelimFrom, n20 };
 }
 
 export const dayToISO = (d) => new Date(EPOCH + d * DAY_MS).toISOString().slice(0, 10);
@@ -85,7 +105,19 @@ export function monthlyCounts(P, inside) {
     if (f & (FLAG.TERRA | FLAG.AQUA)) M[m]++;
     if (f & FLAG.TERRA) T[m]++;
   }
-  return { V, M, T, idx, N };
+  // NOAA-20 burning cell-days per month, and in the month in progress after the record ends
+  const Nn = new Float64Array(N);
+  let tail = 0;
+  const q = P.n20;
+  if (q) {
+    for (let i = 0; i < q.n; i++) {
+      if (inside && !inside(q.a[i] / P.res + half, q.b[i] / P.res + half)) continue;
+      const m = q.mi[i];
+      if (m < N) Nn[m]++;
+      else if (q.day[i] >= q.tailFrom && q.day[i] <= q.throughDay) tail++;
+    }
+  }
+  return { V, M, T, Nn, tail, idx, N };
 }
 
 const overlapMonth = (m, skipYear) => skipYear === null || Math.floor(m / 12) + 2000 !== skipYear;
@@ -105,10 +137,10 @@ const overlapMonth = (m, skipYear) => skipYear === null || Math.floor(m / 12) + 
  * (which months were busy, which were quiet) and gives the result the spread of real VIIRS data.
  * `skipYear` leaves one overlap year out (cross-validation).
  */
-export function fitQuantileMap(V, X, N, skipYear = null) {
+export function fitQuantileMap(V, X, N, skipYear = null, start = ERA.VIIRS_START) {
   const xs = [];
   const vs = [];
-  for (let m = ERA.VIIRS_START; m < N; m++) {
+  for (let m = start; m < N; m++) {
     if (!overlapMonth(m, skipYear)) continue;
     xs.push(X[m]);
     vs.push(V[m]);
@@ -132,7 +164,7 @@ export function fitQuantileMap(V, X, N, skipYear = null) {
     const cnt = new Float64Array(12);
     let S = 0;
     let C = 0;
-    for (let m = ERA.VIIRS_START; m < N; m++) {
+    for (let m = start; m < N; m++) {
       if (!overlapMonth(m, skipYear) || X[m] > table[0][0]) continue;
       sum[m % 12] += V[m];
       cnt[m % 12]++;
@@ -175,12 +207,12 @@ export function fitQuantileMap(V, X, N, skipYear = null) {
 }
 
 /** Baseline for comparison only: one VIIRS/MODIS factor per calendar month (shrunk ratio of sums). */
-export function fitRatio(V, X, N, skipYear = null) {
+export function fitRatio(V, X, N, skipYear = null, start = ERA.VIIRS_START) {
   const sv = new Float64Array(12);
   const sx = new Float64Array(12);
   let SV = 0;
   let SX = 0;
-  for (let m = ERA.VIIRS_START; m < N; m++) {
+  for (let m = start; m < N; m++) {
     if (!overlapMonth(m, skipYear)) continue;
     sv[m % 12] += V[m];
     sx[m % 12] += X[m];
@@ -203,6 +235,8 @@ const quantile = (sorted, p) => {
 
 /** A conversion factor never turns a MODIS count into something smaller than itself. */
 const ratioMap = (fit) => (x, c) => Math.max(x, fit.k[c] * x);
+/** Between two copies of the same instrument (S-NPP and NOAA-20) the factor may be below 1. */
+const plainMap = (fit) => (x, c) => fit.k[c] * x;
 
 /**
  * Leave-one-year-out check of BOTH conversion methods: each overlap year is hidden in turn, the
@@ -210,23 +244,23 @@ const ratioMap = (fit) => (x, c) => Math.max(x, fit.k[c] * x);
  * MODIS alone.
  *   quantile = rank matching (fitQuantileMap)      ratio = one factor per calendar month (fitRatio)
  */
-export function crossValidate(V, X, N) {
+export function crossValidate(V, X, N, start = ERA.VIIRS_START, plain = false) {
   const years = [];
   const resid = { quantile: [], ratio: [] }; // monthly observed - predicted
   const absY = { quantile: 0, ratio: 0 };
   const absM = { quantile: 0, ratio: 0 };
   let sumObs = 0;
-  const firstYear = 2000 + Math.floor(ERA.VIIRS_START / 12);
+  const firstYear = 2000 + Math.floor(start / 12);
   for (let y = firstYear; (y - 2000) * 12 < N; y++) {
-    const q = fitQuantileMap(V, X, N, y);
-    const r = ratioMap(fitRatio(V, X, N, y));
+    const q = fitQuantileMap(V, X, N, y, start);
+    const r = (plain ? plainMap : ratioMap)(fitRatio(V, X, N, y, start));
     let obs = 0;
     let raw = 0;
     const pred = { quantile: 0, ratio: 0 };
     for (let c = 0; c < 12; c++) {
       const m = (y - 2000) * 12 + c;
       if (m >= N) break;
-      if (m < ERA.VIIRS_START) continue; // partial first VIIRS month
+      if (m < start) continue; // partial first month
       const p = { quantile: q.map(X[m], c), ratio: r(X[m], c) };
       obs += V[m];
       raw += X[m];
@@ -310,6 +344,33 @@ export function harmonize(P, inside = null) {
   const cv = { ...cvBoth[method], n: cvBoth.n, method, otherError: cvBoth[other].yearlyError,
     years: cvBoth.years.map((y) => ({ year: y.year, observed: y.observed, predicted: y[method], otherPredicted: y[other], modisRaw: y.modisRaw })) };
   const cvT = cvTBoth[method];
+  // --- NOAA-20 BRIDGE. Suomi NPP stopped delivering data on 2 November 2026; the same instrument
+  // flies on NOAA-20 (in FIRMS since April 2018). The two do not count exactly the same (different
+  // overpass geometry on a given day), so NOAA-20 is converted to S-NPP units with the same two
+  // methods, cross-validated on the months both satellites observed. Between two copies of one
+  // instrument the plain monthly factor is the default; rank matching needs a clear lead.
+  const Na = new Float64Array(N);
+  const sat = new Array(N).fill('');
+  let bridge = null;
+  if (P.n20) {
+    const S0 = ERA.NOAA20_START;
+    for (let m = 0; m < N; m++) Na[m] = c.Nn[m] / Math.max(cv_ ? cv_.noaa20[m] : 1, MIN_COVERAGE);
+    const bq = fitQuantileMap(V, Na, N, null, S0);
+    const br = fitRatio(V, Na, N, null, S0);
+    const bcv = crossValidate(V, Na, N, S0, true);
+    const weak = !(br.SX >= MIN_LOCAL_MODIS);
+    const eqB = bcv.quantile.yearlyError;
+    const erB = bcv.ratio.yearlyError;
+    const bMethod = !weak && Number.isFinite(eqB) && Number.isFinite(erB) && eqB < erB - 0.01 ? 'quantile' : 'ratio';
+    const bOther = bMethod === 'ratio' ? 'quantile' : 'ratio';
+    bridge = {
+      method: bMethod, weak, ratio: br.ratio, SV: br.SV, SX: br.SX,
+      map: bMethod === 'ratio' ? plainMap(br) : bq.map,
+      yearlyError: bcv[bMethod].yearlyError, otherError: bcv[bOther].yearlyError, monthBand: bcv[bMethod].monthBand, n: bcv.n,
+      years: bcv.years.map((y) => ({ year: y.year, observed: y.observed, predicted: y[bMethod], noaa20Raw: y.modisRaw })),
+      filled: 0,
+    };
+  }
   const H = new Float64Array(N).fill(NaN);
   const lo = new Float64Array(N).fill(NaN);
   const hi = new Float64Array(N).fill(NaN);
@@ -320,8 +381,20 @@ export function harmonize(P, inside = null) {
   };
   for (let m = ERA.TERRA_START; m < N; m++) {
     if (m >= ERA.VIIRS_START) {
-      H[m] = V[m];
-      lo[m] = hi[m] = V[m];
+      const covN = cv_ ? cv_.noaa20[m] : 1;
+      if (bridge && !bridge.weak && m >= ERA.NOAA20_START && P.missing && P.missing.viirs[m] >= NOAA20_FILL_DAYS && covN > cov[m]) {
+        // S-NPP was down for several days: NOAA-20 watched the whole month, so it takes this month
+        H[m] = bridge.map(Na[m], m % 12);
+        band(m, H[m], bridge.monthBand);
+        sat[m] = 'NOAA-20';
+        cov[m] = covN;
+        gapDays[m] = P.missing.noaa20[m];
+        bridge.filled++;
+      } else {
+        H[m] = V[m];
+        lo[m] = hi[m] = V[m];
+        sat[m] = 'S-NPP';
+      }
       src[m] = 'VIIRS';
     } else if (m >= ERA.AQUA_START) {
       H[m] = convM(M[m], m % 12);
@@ -333,7 +406,13 @@ export function harmonize(P, inside = null) {
       src[m] = 'Terra';
     }
   }
-  return { ...c, Va, Ma, Ta, cov, gapDays, prelimFrom: P.prelimFrom ?? Infinity, H, lo, hi, src, qm, qt, overlap, method, cv, cvT, cvBoth, lowEvidence };
+  // The month in progress after the record ends, seen by NOAA-20 alone (S-NPP is gone).
+  let now = null;
+  if (P.n20 && bridge && P.n20.throughDay >= P.n20.tailFrom) {
+    const k = Number.isFinite(bridge.ratio) && bridge.ratio > 0 && !bridge.weak ? bridge.ratio : 1;
+    now = { m: N, from: dayToISO(P.n20.tailFrom), to: P.n20.through, days: P.n20.throughDay - P.n20.tailFrom + 1, noaa20: c.tail, equivalent: c.tail * k };
+  }
+  return { ...c, Va, Ma, Ta, Na, cov, gapDays, prelimFrom: P.prelimFrom ?? Infinity, H, lo, hi, src, sat, bridge, now, qm, qt, overlap, method, cv, cvT, cvBoth, lowEvidence };
 }
 
 /** Per calendar month: median and quartiles of the harmonized series. */

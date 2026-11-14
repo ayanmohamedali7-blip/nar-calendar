@@ -109,7 +109,13 @@ test('harmonized series: eras, bands, no NaN where data exist', () => {
         if (m < ERA.TERRA_START) { assert.ok(Number.isNaN(h.H[m])); continue; }
         assert.ok(Number.isFinite(h.H[m]) && h.H[m] >= 0, `${c.id} m=${m}`);
         assert.ok(h.lo[m] <= h.H[m] + 1e-9 && h.hi[m] >= h.H[m] - 1e-9, `${c.id} band m=${m}`);
-        if (m >= ERA.VIIRS_START) { assert.equal(h.H[m], h.Va[m]); assert.ok(h.Va[m] >= h.V[m]); assert.equal(h.src[m], "VIIRS"); }
+        if (m >= ERA.VIIRS_START) {
+          // a month in which S-NPP was down for days comes from NOAA-20 where that record exists
+          if (h.sat[m] === 'NOAA-20') assert.ok(m >= ERA.NOAA20_START && P.missing.viirs[m] >= 3, `${c.id} NOAA-20 month m=${m}`);
+          else assert.equal(h.H[m], h.Va[m]);
+          assert.ok(h.Va[m] >= h.V[m]);
+          assert.equal(h.src[m], 'VIIRS');
+        }
       }
       assert.equal(h.src[ERA.TERRA_START], 'Terra');
       assert.equal(h.src[ERA.AQUA_START], 'MODIS');

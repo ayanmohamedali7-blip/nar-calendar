@@ -75,9 +75,22 @@ test('satellite outages are known and counts are scaled to a full month', () => 
   const jun01 = (2001 - 2000) * 12 + 5;
   assert.equal(P.missing.terra[jun01], 16); // Terra outage 15 Jun to 2 Jul 2001
   const h = harmonize(P);
-  assert.ok(Math.abs(h.H[aug22] - h.V[aug22] / (21 / 31)) < 1e-6);
-  assert.equal(h.gapDays[aug22], 10);
-  assert.ok(Math.abs(h.cov[aug22] - 21 / 31) < 1e-9);
+  // the outage-adjusted S-NPP count is always the raw count scaled to a full month
+  assert.ok(Math.abs(h.Va[aug22] - h.V[aug22] / (21 / 31)) < 1e-6);
+  if (h.sat[aug22] === 'NOAA-20') {
+    // NOAA-20 watched the whole month, so it supplies August 2022 (see test-noaa20.mjs)
+    assert.equal(h.gapDays[aug22], 0);
+    assert.equal(h.cov[aug22], 1);
+  } else {
+    assert.ok(Math.abs(h.H[aug22] - h.Va[aug22]) < 1e-9);
+    assert.equal(h.gapDays[aug22], 10);
+    assert.ok(Math.abs(h.cov[aug22] - 21 / 31) < 1e-9);
+  }
+  // a one-day outage (26 Sep 2024) is still handled by scaling the S-NPP count
+  const sep24 = (2024 - 2000) * 12 + 8;
+  assert.equal(P.missing.viirs[sep24], 1);
+  assert.ok(Math.abs(h.H[sep24] - h.V[sep24] / (29 / 30)) < 1e-6);
+  assert.equal(h.gapDays[sep24], 1);
   // a month without outage is untouched
   const sep22 = aug22 + 1;
   assert.equal(h.H[sep22], h.V[sep22]);

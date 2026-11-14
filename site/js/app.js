@@ -101,7 +101,9 @@ function renderSummary() {
   } else badge = v >= 1 ? '<span class="badge up">▲ Fire in a month that is normally quiet</span>' : '<span class="badge flat">● Quiet, as normal</span>';
   const rank = rankPhrase(D, m);
   const prelim = m >= D.prelimFrom ? ' Preliminary: this month comes from near-real-time data that FIRMS has not labelled yet, so a few gas flares may still be counted.' : '';
-  const gap = D.gapDays[m] > 0 && !est ? ` The satellite was out for ${D.gapDays[m]} days this month, so the count is scaled up to a full month.` : '';
+  const viaN20 = D.sat && D.sat[m] === 'NOAA-20';
+  const gap = viaN20 ? ` Suomi NPP was out for ${P.missing.viirs[m]} days this month, so this month comes from the same instrument on NOAA-20, converted to the same unit.`
+    : D.gapDays[m] > 0 && !est ? ` The satellite was out for ${D.gapDays[m]} days this month, so the count is scaled up to a full month.` : '';
   h += `<div class="stat"><div class="k">${state.selMonth >= 0 ? 'Selected month' : D.lastM === D.N - 1 ? 'Latest month on record' : 'Last month of your period'} · ${MONTHS_LONG[c]} ${2000 + Math.floor(m / 12)}</div>
     <div class="v">${fmt(v)} <small>${cellDays(v)}${est ? ' (estimated)' : ''}</small></div>
     <div class="d">${badge}</div>
@@ -124,6 +126,26 @@ function renderSummary() {
     h += `<div class="stat"><div class="k">How reliable are the years before 2012?</div><div class="v">±${Math.round(100 * e)} % <small>typical miss of a yearly total</small></div>
       <div class="d">Measured by hiding each year of 2012 to ${P.lastYear} and predicting it from MODIS alone.${base}${D.lowEvidence ? ' MODIS saw very few fires here, so treat the years before 2012 as a rough guide only.' : ''}</div></div>`;
   }
+  // The record after Suomi NPP: the same instrument on NOAA-20, tested against the years both flew.
+  const B = D.bridge;
+  if (B) {
+    const filled = B.filled ? ` NOAA-20 already supplies ${B.filled === 1 ? 'the one month' : `the ${B.filled} months`} in which Suomi NPP was down for three days or more.` : '';
+    let soFar = '';
+    if (D.now && D.lastM === D.N - 1) {
+      const d0 = +D.now.from.slice(8, 10);
+      const d1 = +D.now.to.slice(8, 10);
+      const mm = +D.now.to.slice(5, 7) - 1;
+      soFar = ` ${d0} to ${d1} ${MONTHS_LONG[mm]} ${D.now.to.slice(0, 4)}, seen by NOAA-20 alone: ${fmt(D.now.noaa20)} ${cellDays(D.now.noaa20)} so far (a normal full ${MONTHS_LONG[mm]} has ${fmt(D.clim.med[mm])}).`;
+    }
+    const intro = 'Suomi NPP stopped delivering data on 2 November 2026. The same instrument flies on NOAA-20.';
+    if (B.weak || !Number.isFinite(B.yearlyError)) {
+      h += `<div class="stat"><div class="k">After Suomi NPP · the record continues on NOAA-20</div><div class="v" style="font-size:19px">Too few fires to test here</div>
+        <div class="d">${intro} This area has too few fires since 2018 to measure how closely the two agree; draw a larger area to see the test.${soFar}</div></div>`;
+    } else {
+      h += `<div class="stat"><div class="k">After Suomi NPP · the record continues on NOAA-20</div><div class="v">±${Math.round(100 * B.yearlyError)} % <small>typical miss of a yearly total</small></div>
+        <div class="d">${intro} Tested by hiding each year of 2018 to ${P.lastYear} and predicting what Suomi NPP counted from NOAA-20 alone.${filled}${soFar}</div></div>`;
+    }
+  }
   const T = D.trend;
   if (T) {
     // slope per year, in cell-days and as a share of a typical (median) year
@@ -145,7 +167,7 @@ function renderTables() {
   let h = '<table><thead><tr><th>Month</th><th class="num">Activity</th><th class="num">Normal</th><th class="num">Times normal</th><th>Source</th></tr></thead><tbody>';
   for (const m of rows.slice(0, 10)) {
     const med = D.clim.med[m % 12];
-    h += `<tr class="rowlink" data-m="${m}"><td>${MONTHS_LONG[m % 12]} ${2000 + Math.floor(m / 12)}</td><td class="num">${fmt(D.H[m])}</td><td class="num">${fmt(med)}</td><td class="num">${med > 0 ? (D.H[m] / med).toFixed(1) + '×' : 'n/a'}</td><td>${D.src[m] === 'VIIRS' ? 'VIIRS observed' : 'MODIS, converted'}</td></tr>`;
+    h += `<tr class="rowlink" data-m="${m}"><td>${MONTHS_LONG[m % 12]} ${2000 + Math.floor(m / 12)}</td><td class="num">${fmt(D.H[m])}</td><td class="num">${fmt(med)}</td><td class="num">${med > 0 ? (D.H[m] / med).toFixed(1) + '×' : 'n/a'}</td><td>${D.src[m] === 'VIIRS' ? (D.sat && D.sat[m] === 'NOAA-20' ? 'VIIRS on NOAA-20' : 'VIIRS observed') : 'MODIS, converted'}</td></tr>`;
   }
   $('table-months').innerHTML = rows.length ? h + '</tbody></table><p class="note" style="margin-top:8px">Click a row to see that month on the map.</p>' : '<p class="sub">No fire months in this area.</p>';
 }
@@ -353,6 +375,13 @@ function buildFacts() {
     reliabilityOfYearsBefore2012: Number.isFinite(D.cv.yearlyError) && D.overlap.SV >= 30 ? { typicalMissOfAYearlyTotalPercent: Math.round(100 * D.cv.yearlyError), method: D.cv.method === 'ratio' ? 'monthly conversion factors' : 'rank matching' } : 'too few fires to measure',
     shareOfCountryHotSpotsRemovedAsNotFirePercent: t.raw ? Math.round(1000 * (1 - t.kept / t.raw)) / 10 : null,
     preliminary: D.lastM >= D.prelimFrom,
+    continuationOnNOAA20: D.bridge ? {
+      why: 'Suomi NPP stopped delivering data on 2 November 2026; NOAA-20 carries the same instrument',
+      typicalMissOfAYearlyTotalPercent: D.bridge.weak || !Number.isFinite(D.bridge.yearlyError) ? 'too few fires to measure' : Math.round(100 * D.bridge.yearlyError),
+      testedOnYears: `2018 to ${P.lastYear}`,
+      monthsTakenFromNOAA20DuringSuomiNPPOutages: D.bridge.filled,
+      monthInProgress: D.now && D.lastM === D.N - 1 ? { days: `${D.now.from} to ${D.now.to}`, cellDaysSoFarSeenByNOAA20: D.now.noaa20 } : null,
+    } : null,
   };
 }
 
@@ -443,11 +472,12 @@ const slug = () => `${state.country.id}_${state.area.name.toLowerCase().replace(
 function monthlyCsv() {
   const D = state.D;
   const r = (v) => (Number.isFinite(v) ? (Math.round(v * 100) / 100).toString() : '');
-  const lines = ['year,month,harmonized_cell_days,likely_low,likely_high,source,modis_cell_days,viirs_cell_days,sensor_coverage,median_same_month,percentile_rank'];
+  const lines = ['year,month,harmonized_cell_days,likely_low,likely_high,source,modis_cell_days,viirs_cell_days,sensor_coverage,median_same_month,percentile_rank,noaa20_cell_days'];
   for (let m = 0; m < D.N; m++) {
     if (!Number.isFinite(D.H[m])) continue;
-    const src = D.src[m] === 'VIIRS' ? (m >= D.prelimFrom ? 'VIIRS_observed_preliminary' : 'VIIRS_observed') : D.src[m] === 'Terra' ? 'MODIS_Terra_converted' : 'MODIS_converted';
-    lines.push([2000 + Math.floor(m / 12), (m % 12) + 1, r(D.H[m]), r(D.lo[m]), r(D.hi[m]), src, D.M[m], m >= 144 ? D.V[m] : '', r(D.cov[m]), r(D.clim.med[m % 12]), r(D.pct[m])].join(','));
+    const n20 = D.sat && D.sat[m] === 'NOAA-20';
+    const src = D.src[m] === 'VIIRS' ? (n20 ? 'VIIRS_NOAA20_converted' : 'VIIRS_observed') + (m >= D.prelimFrom ? '_preliminary' : '') : D.src[m] === 'Terra' ? 'MODIS_Terra_converted' : 'MODIS_converted';
+    lines.push([2000 + Math.floor(m / 12), (m % 12) + 1, r(D.H[m]), r(D.lo[m]), r(D.hi[m]), src, D.M[m], m >= 144 ? D.V[m] : '', r(D.cov[m]), r(D.clim.med[m % 12]), r(D.pct[m]), D.bridge && m >= ERA.NOAA20_START ? D.Nn[m] : ''].join(','));
   }
   return lines.join('\n') + '\n';
 }
