@@ -348,7 +348,9 @@ const ai = { lang: 'en', busy: false };
 function buildFacts() {
   const { D, P, area, country } = state;
   const label = (m) => `${MONTHS_LONG[m % 12]} ${2000 + Math.floor(m / 12)}`;
-  const monthFacts = (m) => ({ month: label(m), cellDays: D.H[m], normalForThatMonth: D.clim.med[m % 12], rankFromTop: 1 + D.rankAbove[m], yearsCompared: D.clim.count[m % 12], estimatedFromMODIS: D.src[m] !== 'VIIRS', satelliteOutageDays: D.gapDays[m] });
+  // whole numbers for the model: a count like 365.33 reads badly in a briefing
+  const whole = (v) => (Number.isFinite(v) ? Math.round(v) : v);
+  const monthFacts = (m) => ({ month: label(m), cellDays: whole(D.H[m]), normalForThatMonth: whole(D.clim.med[m % 12]), rankFromTop: 1 + D.rankAbove[m], yearsCompared: D.clim.count[m % 12], estimatedFromMODIS: D.src[m] !== 'VIIRS', satelliteOutageDays: D.gapDays[m] });
   const full = D.years.filter((y) => y.months === 12);
   const byTotal = [...full].sort((p, q) => q.total - p.total);
   const months = [];
@@ -366,12 +368,12 @@ function buildFacts() {
     latestMonth: monthFacts(D.lastM),
     selectedMonth: state.selMonth >= 0 ? monthFacts(state.selMonth) : null,
     fireSeason: season ? { months: season.range, peak: season.peak } : null,
-    normalByMonth: Object.fromEntries(MONTHS.map((n, c) => [n, D.clim.med[c]])),
-    mostActiveYears: byTotal.slice(0, 3).map((y) => ({ year: y.year, cellDays: y.total, estimatedFromMODIS: !y.observed })),
-    quietestYear: byTotal.length ? { year: byTotal[byTotal.length - 1].year, cellDays: byTotal[byTotal.length - 1].total } : null,
-    mostActiveMonths: months.slice(0, 5).map((m) => ({ month: label(m), cellDays: D.H[m] })),
-    yearlyTotals: Object.fromEntries(full.map((y) => ['y' + y.year, y.total])),
-    trend: T ? { direction: T.p < 0.05 ? (T.slope > 0 ? 'rising' : 'falling') : 'no clear trend', cellDaysPerYear: T.slope, pValue: T.p, completeYears: T.n } : null,
+    normalByMonth: Object.fromEntries(MONTHS.map((n, c) => [n, whole(D.clim.med[c])])),
+    mostActiveYears: byTotal.slice(0, 3).map((y) => ({ year: y.year, cellDays: whole(y.total), estimatedFromMODIS: !y.observed })),
+    quietestYear: byTotal.length ? { year: byTotal[byTotal.length - 1].year, cellDays: whole(byTotal[byTotal.length - 1].total) } : null,
+    mostActiveMonths: months.slice(0, 5).map((m) => ({ month: label(m), cellDays: whole(D.H[m]) })),
+    yearlyTotals: Object.fromEntries(full.map((y) => ['y' + y.year, whole(y.total)])),
+    trend: T ? { direction: T.p < 0.05 ? (T.slope > 0 ? 'rising' : 'falling') : 'no clear trend', cellDaysPerYear: Math.round(T.slope), pValue: Math.round(T.p * 1000) / 1000, completeYears: T.n } : null,
     reliabilityOfYearsBefore2012: Number.isFinite(D.cv.yearlyError) && D.overlap.SV >= 30 ? { typicalMissOfAYearlyTotalPercent: Math.round(100 * D.cv.yearlyError), method: D.cv.method === 'ratio' ? 'monthly conversion factors' : 'rank matching' } : 'too few fires to measure',
     shareOfCountryHotSpotsRemovedAsNotFirePercent: t.raw ? Math.round(1000 * (1 - t.kept / t.raw)) / 10 : null,
     preliminary: D.lastM >= D.prelimFrom,
