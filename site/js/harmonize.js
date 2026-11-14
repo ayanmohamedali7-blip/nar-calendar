@@ -1,0 +1,310 @@
+// MODIS + VIIRS harmonization core. Pure functions, no DOM: used by the web app and by
+// the Node validation script (pipeline/validate.mjs).
+//
+// Unit: "burning cell-day" = one 0.01 deg grid cell with at least one fire detection on one day.
+// Target unit of the harmonized series: VIIRS-equivalent burning cell-days per month.
+
+export const FLAG = { TERRA: 1, AQUA: 2, VIIRS: 4, NIGHT: 8 };
+const DAY_MS = 86400000;
+const EPOCH = Date.UTC(2000, 0, 1);
+
+// First month (index from Jan 2000) in which each sensor gives a full month of fire data.
+export const ERA = {
+  TERRA_START: 10, // Nov 2000 (start of the MODIS/Terra active-fire archive)
+  AQUA_START: 30, // Jul 2002 (Aqua fire data begins 4 Jul 2002)
+  VIIRS_START: 145, // Feb 2012 (S-NPP VIIRS 375 m data begins 20 Jan 2012; January is partial)
+};
+export const PRIOR_STRENGTH = 20; // shrinkage weight of the ratio baseline, in MODIS cell-days
+export const SEASON_PRIOR = 2; // shrinkage of the season weights, in months
+export const MIN_LOCAL_MODIS = 30; // with fewer MODIS cell-days in the overlap the mapping is flagged as weak
+
+/** Decode a country pack (see pipeline/build-data.mjs) into typed arrays. */
+export function decodePack(pack) {
+  const n = pack.n;
+  const day = new Int32Array(n);
+  const a = Int32Array.from(pack.a);
+  const b = Int32Array.from(pack.b);
+  const f = Uint8Array.from(pack.f);
+  const frp = Uint16Array.from(pack.frp);
+  const mi = new Int16Array(n); // month index since Jan 2000
+  let d = 0;
+  for (let i = 0; i < n; i++) {
+    d += pack.dd[i];
+    day[i] = d;
+    const t = new Date(EPOCH + d * DAY_MS);
+    mi[i] = (t.getUTCFullYear() - 2000) * 12 + t.getUTCMonth();
+  }
+  const lastYear = Math.max(pack.years.modis[1], pack.years.viirs[1]);
+  return { ...pack, day, a, b, f, frp, mi, nMonths: (lastYear - 2000 + 1) * 12, lastYear };
+}
+
+export const dayToISO = (d) => new Date(EPOCH + d * DAY_MS).toISOString().slice(0, 10);
+
+/** Monthly burning cell-day counts inside an area. `inside(lat, lon)` is a predicate (null = whole pack). */
+export function monthlyCounts(P, inside) {
+  const N = P.nMonths;
+  const V = new Float64Array(N);
+  const M = new Float64Array(N);
+  const T = new Float64Array(N);
+  const idx = [];
+  const half = 0.5 / P.res;
+  for (let i = 0; i < P.n; i++) {
+    if (inside && !inside(P.a[i] / P.res + half, P.b[i] / P.res + half)) continue;
+    idx.push(i);
+    const m = P.mi[i];
+    const f = P.f[i];
+    if (f & FLAG.VIIRS) V[m]++;
+    if (f & (FLAG.TERRA | FLAG.AQUA)) M[m]++;
+    if (f & FLAG.TERRA) T[m]++;
+  }
+  return { V, M, T, idx, N };
+}
+
+const overlapMonth = (m, skipYear) => skipYear === null || Math.floor(m / 12) + 2000 !== skipYear;
+
+/**
+ * Calibration by QUANTILE MAPPING, fitted on the overlap period (both sensors flying).
+ *
+ * The monthly MODIS counts and the monthly VIIRS counts of the same months are each sorted.
+ * A MODIS value is converted to the VIIRS value that holds the same rank: the 10th busiest
+ * MODIS month becomes the 10th busiest VIIRS month. Tied MODIS values (many months are 0)
+ * take the mean of the VIIRS values that share those ranks (for the lowest block this mean is
+ * modulated by season, see below); values between two known points
+ * are interpolated; values above the largest MODIS month are scaled proportionally.
+ *
+ * Why this and not a single factor: VIIRS (375 m) sees many small fires that MODIS (1 km)
+ * never sees, so VIIRS/MODIS is not constant. Quantile mapping keeps what MODIS does know
+ * (which months were busy, which were quiet) and gives the result the spread of real VIIRS data.
+ * `skipYear` leaves one overlap year out (cross-validation).
+ */
+export function fitQuantileMap(V, X, N, skipYear = null) {
+  const xs = [];
+  const vs = [];
+  for (let m = ERA.VIIRS_START; m < N; m++) {
+    if (!overlapMonth(m, skipYear)) continue;
+    xs.push(X[m]);
+    vs.push(V[m]);
+  }
+  xs.sort((p, q) => p - q);
+  vs.sort((p, q) => p - q);
+  const table = []; // [MODIS value, VIIRS-equivalent value]
+  for (let i = 0; i < xs.length; ) {
+    let j = i;
+    let sum = 0;
+    while (j < xs.length && xs[j] === xs[i]) sum += vs[j++];
+    table.push([xs[i], sum / (j - i)]);
+    i = j;
+  }
+  // Season weights for the lowest block (usually "MODIS saw nothing"): a quiet MODIS month in the
+  // fire season hides more small fires than a quiet MODIS month in winter. The weights average
+  // to about 1 over that block, so the VIIRS distribution is preserved.
+  const w = new Float64Array(12).fill(1);
+  if (table.length) {
+    const sum = new Float64Array(12);
+    const cnt = new Float64Array(12);
+    let S = 0;
+    let C = 0;
+    for (let m = ERA.VIIRS_START; m < N; m++) {
+      if (!overlapMonth(m, skipYear) || X[m] > table[0][0]) continue;
+      sum[m % 12] += V[m];
+      cnt[m % 12]++;
+      S += V[m];
+      C++;
+    }
+    const mean = C ? S / C : 0;
+    if (mean > 0) for (let c = 0; c < 12; c++) w[c] = (sum[c] + SEASON_PRIOR * mean) / (cnt[c] + SEASON_PRIOR) / mean;
+  }
+  const map = (x, c = null) => {
+    if (!table.length) return 0;
+    if (x <= table[0][0]) return table[0][1] * (c === null ? 1 : w[c]);
+    for (let i = 1; i < table.length; i++) {
+      if (x <= table[i][0]) {
+        const [x0, v0] = table[i - 1];
+        const [x1, v1] = table[i];
+        return v0 + ((v1 - v0) * (x - x0)) / (x1 - x0);
+      }
+    }
+    const [xl, vl] = table[table.length - 1];
+    return xl > 0 ? (vl * x) / xl : vl;
+  };
+  return { map, table, seasonWeights: w };
+}
+
+/** Baseline for comparison only: one VIIRS/MODIS factor per calendar month (shrunk ratio of sums). */
+export function fitRatio(V, X, N, skipYear = null) {
+  const sv = new Float64Array(12);
+  const sx = new Float64Array(12);
+  let SV = 0;
+  let SX = 0;
+  for (let m = ERA.VIIRS_START; m < N; m++) {
+    if (!overlapMonth(m, skipYear)) continue;
+    sv[m % 12] += V[m];
+    sx[m % 12] += X[m];
+    SV += V[m];
+    SX += X[m];
+  }
+  const ratio = SX > 0 ? SV / SX : 0;
+  const k = new Float64Array(12);
+  for (let c = 0; c < 12; c++) k[c] = (sv[c] + PRIOR_STRENGTH * ratio) / (sx[c] + PRIOR_STRENGTH);
+  return { k, ratio, SV, SX };
+}
+
+const quantile = (sorted, p) => {
+  if (!sorted.length) return NaN;
+  const x = p * (sorted.length - 1);
+  const lo = Math.floor(x);
+  const hi = Math.ceil(x);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (x - lo);
+};
+
+/**
+ * Leave-one-year-out check: each overlap year is hidden in turn, the mapping is fitted on the
+ * other years and has to predict the hidden year's VIIRS counts from MODIS alone.
+ */
+export function crossValidate(V, X, N) {
+  const years = [];
+  const resid = []; // monthly observed - predicted
+  let absM = 0;
+  let absY = 0;
+  let absYratio = 0;
+  let sumObs = 0;
+  const firstYear = 2000 + Math.floor(ERA.VIIRS_START / 12);
+  for (let y = firstYear; (y - 2000) * 12 < N; y++) {
+    const q = fitQuantileMap(V, X, N, y);
+    const ratio = fitRatio(V, X, N, y);
+    let obs = 0;
+    let pred = 0;
+    let ratioPred = 0;
+    let raw = 0;
+    for (let c = 0; c < 12; c++) {
+      const m = (y - 2000) * 12 + c;
+      if (m >= N) break;
+      if (m < ERA.VIIRS_START) continue; // partial first VIIRS month
+      const p = q.map(X[m], c);
+      obs += V[m];
+      raw += X[m];
+      pred += p;
+      ratioPred += ratio.k[c] * X[m];
+      resid.push(V[m] - p);
+      absM += Math.abs(V[m] - p);
+    }
+    years.push({ year: y, observed: obs, predicted: pred, ratioPredicted: ratioPred, modisRaw: raw });
+    absY += Math.abs(obs - pred);
+    absYratio += Math.abs(obs - ratioPred);
+    sumObs += obs;
+  }
+  resid.sort((p, q) => p - q);
+  const rel = years
+    .filter((r) => r.predicted > 0)
+    .map((r) => r.observed / r.predicted)
+    .sort((p, q) => p - q);
+  return {
+    years,
+    n: years.length,
+    yearlyError: sumObs > 0 ? absY / sumObs : NaN, // weighted absolute % error of yearly totals
+    yearlyErrorRatio: sumObs > 0 ? absYratio / sumObs : NaN, // same for the single-factor baseline
+    monthlyError: sumObs > 0 ? absM / sumObs : NaN,
+    monthBand: [quantile(resid, 0.1), quantile(resid, 0.9)], // additive 80 % band for one month
+    yearBand: [quantile(rel, 0.1), quantile(rel, 0.9)], // multiplicative 80 % band for one year
+  };
+}
+
+/**
+ * Build the harmonized monthly series for an area, in VIIRS-equivalent burning cell-days.
+ *   Feb 2012 ->        : VIIRS as observed
+ *   Jul 2002 - Jan 2012: MODIS Terra+Aqua, quantile-mapped to VIIRS units
+ *   Nov 2000 - Jun 2002: MODIS Terra alone (Aqua not yet launched), with its own mapping
+ */
+export function harmonize(P, inside = null) {
+  const c = monthlyCounts(P, inside);
+  const { V, M, T, N } = c;
+  const qm = fitQuantileMap(V, M, N);
+  const qt = fitQuantileMap(V, T, N);
+  const overlap = fitRatio(V, M, N);
+  const cv = crossValidate(V, M, N);
+  const cvT = crossValidate(V, T, N);
+  const H = new Float64Array(N).fill(NaN);
+  const lo = new Float64Array(N).fill(NaN);
+  const hi = new Float64Array(N).fill(NaN);
+  const src = new Array(N).fill('none');
+  const band = (m, v, b) => {
+    lo[m] = Math.max(0, v + (Number.isFinite(b[0]) ? b[0] : 0));
+    hi[m] = Math.max(v, v + (Number.isFinite(b[1]) ? b[1] : 0));
+  };
+  for (let m = ERA.TERRA_START; m < N; m++) {
+    if (m >= ERA.VIIRS_START) {
+      H[m] = V[m];
+      lo[m] = hi[m] = V[m];
+      src[m] = 'VIIRS';
+    } else if (m >= ERA.AQUA_START) {
+      H[m] = qm.map(M[m], m % 12);
+      band(m, H[m], cv.monthBand);
+      src[m] = 'MODIS';
+    } else {
+      H[m] = qt.map(T[m], m % 12);
+      band(m, H[m], cvT.monthBand);
+      src[m] = 'Terra';
+    }
+  }
+  // too few MODIS fires in the overlap = the mapping rests on very little evidence
+  const lowEvidence = !(overlap.SX >= MIN_LOCAL_MODIS);
+  return { ...c, H, lo, hi, src, qm, qt, overlap, cv, cvT, lowEvidence };
+}
+
+/** Per calendar month: median and quartiles of the harmonized series. */
+export function climatology(H, N) {
+  const med = new Float64Array(12);
+  const q1 = new Float64Array(12);
+  const q3 = new Float64Array(12);
+  const count = new Int32Array(12);
+  for (let c = 0; c < 12; c++) {
+    const z = [];
+    for (let m = c; m < N; m += 12) if (Number.isFinite(H[m])) z.push(H[m]);
+    z.sort((p, q) => p - q);
+    count[c] = z.length;
+    med[c] = quantile(z, 0.5);
+    q1[c] = quantile(z, 0.25);
+    q3[c] = quantile(z, 0.75);
+  }
+  return { med, q1, q3, count };
+}
+
+/** Rank of one month against the same calendar month in all other years (0..1). */
+export function percentileOf(H, m) {
+  let below = 0;
+  let n = 0;
+  for (let j = m % 12; j < H.length; j += 12) {
+    if (j === m || !Number.isFinite(H[j])) continue;
+    n++;
+    if (H[j] < H[m]) below++;
+    else if (H[j] === H[m]) below += 0.5;
+  }
+  return n ? below / n : NaN;
+}
+
+// ---- geometry helpers ----
+export const inBox = (s, w, n, e) => (lat, lon) => lat >= s && lat <= n && lon >= w && lon <= e;
+
+/** ring: [[lat, lon], ...] */
+export function inPolygon(ring) {
+  let s = 90;
+  let n = -90;
+  let w = 180;
+  let e = -180;
+  for (const [la, lo] of ring) {
+    s = Math.min(s, la);
+    n = Math.max(n, la);
+    w = Math.min(w, lo);
+    e = Math.max(e, lo);
+  }
+  return (lat, lon) => {
+    if (lat < s || lat > n || lon < w || lon > e) return false;
+    let inside = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [yi, xi] = ring[i];
+      const [yj, xj] = ring[j];
+      if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+}

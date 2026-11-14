@@ -1,0 +1,33 @@
+{
+  "countries": [
+    {
+      "id": "libya",
+      "name": "Libya",
+      "file": "libya.json",
+      "presets": [
+        { "id": "jebel-akhdar", "name": "Jebel Akhdar (Green Mountain)", "box": [32.0, 20.5, 33.0, 23.2] },
+        { "id": "tripoli-jefara", "name": "Tripoli and the Jefara plain", "box": [32.2, 12.0, 33.0, 14.5] },
+        { "id": "nafusa", "name": "Nafusa Mountains", "box": [31.6, 10.8, 32.2, 13.2] },
+        { "id": "benghazi", "name": "Benghazi plain", "box": [31.5, 19.8, 32.6, 20.6] },
+        { "id": "murzuq-sabha", "name": "Murzuq and Sabha oases", "box": [25.5, 12.5, 27.6, 15.5] }
+      ],
+      "places": [
+        { "name": "Tripoli", "lat": 32.887, "lon": 13.191 },
+        { "name": "Benghazi", "lat": 32.117, "lon": 20.067 },
+        { "name": "Misrata", "lat": 32.375, "lon": 15.092 },
+        { "name": "Al Bayda", "lat": 32.763, "lon": 21.755 },
+        { "name": "Derna", "lat": 32.767, "lon": 22.639 },
+        { "name": "Tobruk", "lat": 32.084, "lon": 23.976 },
+        { "name": "Al Marj", "lat": 32.493, "lon": 20.83 },
+        { "name": "Ajdabiya", "lat": 30.755, "lon": 20.226 },
+        { "name": "Sirte", "lat": 31.205, "lon": 16.588 },
+        { "name": "Gharyan", "lat": 32.172, "lon": 13.02 },
+        { "name": "Nalut", "lat": 31.868, "lon": 10.983 },
+        { "name": "Sabha", "lat": 27.038, "lon": 14.428 },
+        { "name": "Murzuq", "lat": 25.916, "lon": 13.918 },
+        { "name": "Kufra", "lat": 24.18, "lon": 23.29 },
+        { "name": "Ghadames", "lat": 30.133, "lon": 9.5 }
+      ]
+    }
+  ]
+}

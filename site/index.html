@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nar Calendar: one fire record from MODIS and VIIRS</title>
+<meta name="description" content="A harmonized MODIS + VIIRS burning calendar. Draw any area, see every month of fire since 2000, spot abnormal months, download the data.">
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="8" height="8" rx="2" fill="#5a2a16"/><rect x="12" y="2" width="8" height="8" rx="2" fill="#c4500f"/><rect x="22" y="2" width="8" height="8" rx="2" fill="#8f3a12"/><rect x="2" y="12" width="8" height="8" rx="2" fill="#ea7317"/><rect x="12" y="12" width="8" height="8" rx="2" fill="#fdc86f"/><rect x="22" y="12" width="8" height="8" rx="2" fill="#f9a03a"/><rect x="2" y="22" width="8" height="8" rx="2" fill="#8f3a12"/><rect x="12" y="22" width="8" height="8" rx="2" fill="#c4500f"/><rect x="22" y="22" width="8" height="8" rx="2" fill="#5a2a16"/></svg>
+    <div>
+      <h1>Nar Calendar</h1>
+      <p class="tag">One fire record from two generations of NASA satellites, 2000 to today</p>
+    </div>
+  </div>
+  <nav class="top-nav">
+    <label class="field">Country
+      <select id="country"></select>
+    </label>
+    <a href="#method">How it works</a>
+  </nav>
+</header>
+
+<main>
+  <section class="stage">
+    <div class="map-card card">
+      <div class="toolbar" role="toolbar" aria-label="Choose an area">
+        <span class="toolbar-label">Area</span>
+        <select id="preset" aria-label="Ready-made areas"></select>
+        <button id="btn-rect" type="button" title="Click two opposite corners on the map">Draw rectangle</button>
+        <button id="btn-poly" type="button" title="Click the corners of your area, then click the first point again">Draw polygon</button>
+        <button id="btn-coords" type="button" aria-expanded="false">Enter coordinates</button>
+        <span class="spacer"></span>
+        <label class="check"><input type="checkbox" id="chk-static"> Show removed gas flares</label>
+      </div>
+      <form id="coords" class="coords" hidden>
+        <label>South <input name="s" type="number" step="0.01" min="-90" max="90" required></label>
+        <label>West <input name="w" type="number" step="0.01" min="-180" max="180" required></label>
+        <label>North <input name="n" type="number" step="0.01" min="-90" max="90" required></label>
+        <label>East <input name="e" type="number" step="0.01" min="-180" max="180" required></label>
+        <button type="submit" class="primary">Apply</button>
+        <span class="hint">Decimal degrees, for example 32.0, 20.5, 33.0, 23.2</span>
+      </form>
+      <div class="map-box">
+        <div id="draw-hint" class="draw-hint" hidden></div>
+        <div id="map" aria-label="Map of fire detections"></div>
+        <div class="map-legend" id="map-legend"></div>
+      </div>
+    </div>
+
+    <aside class="summary" id="summary" aria-live="polite"></aside>
+  </section>
+
+  <section class="card" id="calendar-card">
+    <div class="card-head">
+      <div>
+        <h2>Burning calendar</h2>
+        <p class="sub" id="cal-sub"></p>
+      </div>
+      <div class="seg" role="group" aria-label="Calendar colours">
+        <button type="button" data-mode="activity" class="on">Fire activity</button>
+        <button type="button" data-mode="anomaly">Compared with normal</button>
+      </div>
+    </div>
+    <div id="calendar"></div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Fire by year</h2>
+      <p class="sub" id="year-sub"></p>
+      <div id="chart-years"></div>
+    </div>
+    <div class="card">
+      <h2>The fire season</h2>
+      <p class="sub" id="season-sub"></p>
+      <div id="chart-season"></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Can we trust the older years?</h2>
+      <p class="sub" id="valid-sub"></p>
+      <div id="chart-valid"></div>
+    </div>
+    <div class="card">
+      <h2>Not every hot spot is a fire</h2>
+      <p class="sub" id="funnel-sub"></p>
+      <div id="chart-funnel"></div>
+    </div>
+  </section>
+
+  <section class="grid2">
+    <div class="card">
+      <h2>Most active months</h2>
+      <div id="table-months"></div>
+    </div>
+    <div class="card">
+      <h2>Take the data</h2>
+      <p class="sub">Everything on this page for the selected area, as plain CSV files.</p>
+      <div class="downloads">
+        <button type="button" class="primary" id="dl-monthly">Monthly series (CSV)</button>
+        <button type="button" id="dl-cells">Fire cell-days (CSV)</button>
+        <button type="button" id="copy-link">Copy link to this area</button>
+      </div>
+      <p class="note" id="dl-note"></p>
+    </div>
+  </section>
+
+  <section class="card method" id="method">
+    <h2>How it works</h2>
+    <div class="method-grid">
+      <div>
+        <h3>1. Two satellites, two rulers</h3>
+        <p>MODIS (on Terra and Aqua) has mapped fire since November 2000 with 1 km pixels. VIIRS (on Suomi NPP) started in January 2012 with 375 m pixels and sees many small fires that MODIS misses. Put side by side, the two records look like a jump in fire in 2012 that never happened.</p>
+      </div>
+      <div>
+        <h3>2. Keep only real fires</h3>
+        <p>We keep detections that FIRMS labels as presumed vegetation fire, drop low-confidence ones, then mask every 1 km cell around a known static heat source (gas flares, industry) and every place that is hot all year round. In Libya this removes about 98 % of all hot spots.</p>
+      </div>
+      <div>
+        <h3>3. One common unit</h3>
+        <p>Both sensors are placed on the same 0.01° grid (about 1 km). A cell that burns on a given day counts once, whatever the pixel size: a <em>burning cell-day</em>.</p>
+      </div>
+      <div>
+        <h3>4. Learn the link where both fly</h3>
+        <p>From 2012 to 2025 both sensors watched the same land. For your area we rank all those months twice, once by MODIS and once by VIIRS, and match the ranks: the 10th busiest MODIS month takes the value of the 10th busiest VIIRS month. This is <em>quantile mapping</em>, the technique climate scientists use to join instrument records.</p>
+      </div>
+      <div>
+        <h3>5. One series, with honest error bars</h3>
+        <p>Before 2012 the calendar shows MODIS converted to VIIRS units; from 2012 it shows VIIRS itself. Each overlap year is hidden in turn and predicted from MODIS alone, so the error you see is measured, not assumed. We tested three methods this way and kept the one that is both accurate and keeps the real ups and downs.</p>
+      </div>
+      <div>
+        <h3>Limits</h3>
+        <p>Satellites miss fires under cloud and between overpasses. A month where MODIS saw nothing gets the typical small-fire level VIIRS sees in such months, which assumes the years before 2012 resembled 2012 to 2025. A single early month is a rough estimate; yearly totals and the season shape are more reliable.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p><strong>Data:</strong> NASA FIRMS active fire archive (MODIS Collection 6.1, VIIRS S-NPP 375 m). Basemap: NASA GIBS Blue Marble. We acknowledge the use of data from NASA's Fire Information for Resource Management System (FIRMS), part of NASA's Earth Science Data and Information System (ESDIS).</p>
+  <p><strong>Team Sawissi Lab</strong>, Libya. NASA Space Apps Challenge 2026, "Harmonization of MODIS and VIIRS Hot Spots". Code written with the help of an AI assistant (Claude, by Anthropic); see the project page for the full disclosure. Not an official NASA product.</p>
+</footer>
+
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<script src="vendor/leaflet/leaflet.js"></script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

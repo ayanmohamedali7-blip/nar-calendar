@@ -1,0 +1,5 @@
+# Raw FIRMS downloads (about 50 MB per country). Re-create with: node pipeline/download.mjs Libya
+raw/
+node_modules/
+.DS_Store
+Thumbs.db
