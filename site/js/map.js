@@ -103,6 +103,9 @@ export function createMap(el, { onArea, onDrawState }) {
     }
   });
   layer.addTo(map);
+  // The map box changes height when the buttons above it wrap onto one line or two (a longer area
+  // name is enough). Leaflet has to be told, or part of the box stays without tiles.
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(() => map.invalidateSize({ pan: false })).observe(map.getContainer());
 
   // ---- area outline ----
   let outline = null;
