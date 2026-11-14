@@ -85,8 +85,9 @@ export function renderCalendar(el, D, { mode, selMonth }) {
     const mid = (y0 + y1) / 2;
     return `<path d="M12 ${y0} H7 V${y1} H12" fill="none" stroke="${color}" stroke-width="2"/><text class="lbl" x="18" y="${mid - 2}">${l1}</text><text class="axis" x="18" y="${mid + 12}">${l2}</text>`;
   };
-  if (firstViirs > 0) s += bracket(0, firstViirs, C.modis, 'MODIS', 'converted');
-  s += bracket(Math.max(0, firstViirs), rows, C.viirs, 'VIIRS', 'observed');
+  // the selected years may lie entirely in one era
+  if (firstViirs !== 0) s += bracket(0, firstViirs < 0 ? rows : firstViirs, C.modis, 'MODIS', 'converted');
+  if (firstViirs >= 0) s += bracket(firstViirs, rows, C.viirs, 'VIIRS', 'observed');
 
   years.forEach((Y, r) => {
     const y = top + r * rh;
@@ -141,6 +142,7 @@ export function renderCalendar(el, D, { mode, selMonth }) {
 export function renderRecords(el, D) {
   const W = 620, HGT = 300, l = 44, r = 96, t = 14, b = 30;
   const ys = D.years.filter((y) => y.months === 12);
+  if (ys.length < 2) { el.innerHTML = '<p class="sub" style="padding:30px 0">Choose at least two complete years to see this chart.</p>'; return; }
   const max = niceMax(Math.max(...ys.map((y) => Math.max(y.hi || 0, y.total, y.viirs, y.modis))));
   const x = (yr) => l + ((yr - ys[0].year) / (ys[ys.length - 1].year - ys[0].year)) * (W - l - r);
   const y = (v) => t + (1 - v / max) * (HGT - t - b);

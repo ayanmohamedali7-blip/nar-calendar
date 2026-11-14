@@ -14,7 +14,9 @@ Draw any area on the map (or type its coordinates) and Nar Calendar shows:
 - how each month compares with what is **normal** for that month (median of all years);
 - the **fire season**, the most active years and months;
 - how far the older, MODIS-based years can be **trusted**, measured rather than assumed;
-- **CSV downloads** of everything.
+- the **long-term trend** (Theil-Sen slope with the Mann-Kendall test), so a real change is told apart from ups and downs;
+- any **range of years** you choose: the normal, the ranks, the trend and the downloads all follow it;
+- **downloads**: the monthly series and every fire cell as CSV, and the calendar itself as a PNG image.
 
 Country packs so far: **Libya**, where the story started (the forests of Jebel Akhdar, the Green Mountain), **Algeria**, **Egypt** and **Tunisia**. Any other country is two commands away (see "Run it").
 

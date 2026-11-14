@@ -1,16 +1,22 @@
 // Nar Calendar: application wiring (state, summary cards, tables, downloads).
-import { decodePack, harmonize, climatology, percentileOf, inBox, inPolygon, dayToISO, ERA, FLAG } from './harmonize.js';
+import { decodePack, harmonize, climatology, percentileOf, trend, inBox, inPolygon, dayToISO, ERA, FLAG } from './harmonize.js';
 import { createMap, sensorNames } from './map.js';
 import { renderCalendar, renderRecords, renderSeason, renderValidation, renderFunnel, rankPhrase, MONTHS, MONTHS_LONG, fmt, esc } from './charts.js';
 
 const $ = (id) => document.getElementById(id);
-const state = { index: null, country: null, P: null, countryFit: null, area: null, D: null, selMonth: -1, calMode: 'activity' };
+const state = { index: null, country: null, P: null, countryFit: null, area: null, res: null, range: [2000, 2100], D: null, selMonth: -1, calMode: 'activity' };
 let mapApi;
 let lastHash = '';
 
 // ---------------------------------------------------------------- derived numbers
-function derive(P, res) {
-  const { H, lo, hi, V, M, N, src, cv } = res;
+// `range` = [first year, last year] chosen by the user: every statistic (normal, ranks, trend,
+// tables, downloads) is computed inside it. The MODIS-to-VIIRS mapping itself always uses the
+// whole overlap period.
+function derive(P, res, range) {
+  const { lo, hi, V, M, N, src, cv } = res;
+  const [y0, y1] = range;
+  const inRange = (m) => { const y = 2000 + Math.floor(m / 12); return y >= y0 && y <= y1; };
+  const H = Float64Array.from(res.H, (v, m) => (inRange(m) ? v : NaN));
   const clim = climatology(H, N);
   const pct = new Float64Array(N).fill(NaN);
   const rankAbove = new Int16Array(N);
@@ -30,7 +36,7 @@ function derive(P, res) {
   const vmax = Math.max(3, finite[Math.floor(0.98 * (finite.length - 1))] || 0);
   const yb = cv.yearBand.every(Number.isFinite) ? cv.yearBand : [1, 1];
   const years = [];
-  for (let y = 2000; y <= P.lastYear; y++) {
+  for (let y = Math.max(2000, y0); y <= Math.min(P.lastYear, y1); y++) {
     const Y = { year: y, total: 0, modelled: 0, months: 0, modis: 0, viirs: 0 };
     for (let c = 0; c < 12; c++) {
       const m = (y - 2000) * 12 + c;
@@ -46,7 +52,12 @@ function derive(P, res) {
     Y.hi = Y.total - Y.modelled + Y.modelled * Math.max(1, yb[1]);
     years.push(Y);
   }
-  return { ...res, clim, pct, rankAbove, rankTie, vmax, years, total: finite.reduce((s, v) => s + v, 0) };
+  const idx = res.idx.filter((i) => inRange(P.mi[i]));
+  let lastM = -1;
+  for (let m = N - 1; m >= 0 && lastM < 0; m--) if (Number.isFinite(H[m])) lastM = m;
+  const firstM = H.findIndex(Number.isFinite);
+  const full = years.filter((y) => y.months === 12);
+  return { ...res, H, idx, clim, pct, rankAbove, rankTie, vmax, years, firstM, lastM, range: [Math.max(2000, y0), Math.min(P.lastYear, y1)], trend: trend(full.map((y) => y.total)), trendYears: full.length ? [full[0].year, full[full.length - 1].year] : null, total: finite.reduce((s, v) => s + v, 0) };
 }
 
 const cellDays = (v) => (fmt(v) === '1' ? 'burning cell-day' : 'burning cell-days');
@@ -77,7 +88,7 @@ function renderSummary() {
     $('summary').innerHTML = h + `<div class="empty">No vegetation fire has been detected in this area since 2000 inside ${esc(state.country.name)}. This page counts one country at a time: if your area lies in ${esc(others)}, choose that country at the top. Otherwise try a larger area or one of the ready-made areas.</div>`;
     return;
   }
-  const m = state.selMonth >= 0 ? state.selMonth : D.N - 1;
+  const m = state.selMonth >= 0 ? state.selMonth : D.lastM;
   const c = m % 12;
   const v = D.H[m];
   const med = D.clim.med[c];
@@ -91,7 +102,7 @@ function renderSummary() {
   const rank = rankPhrase(D, m);
   const prelim = m >= D.prelimFrom ? ' Preliminary: this month comes from near-real-time data that FIRMS has not labelled yet, so a few gas flares may still be counted.' : '';
   const gap = D.gapDays[m] > 0 && !est ? ` The satellite was out for ${D.gapDays[m]} days this month, so the count is scaled up to a full month.` : '';
-  h += `<div class="stat"><div class="k">${state.selMonth >= 0 ? 'Selected month' : 'Latest month on record'} · ${MONTHS_LONG[c]} ${2000 + Math.floor(m / 12)}</div>
+  h += `<div class="stat"><div class="k">${state.selMonth >= 0 ? 'Selected month' : D.lastM === D.N - 1 ? 'Latest month on record' : 'Last month of your period'} · ${MONTHS_LONG[c]} ${2000 + Math.floor(m / 12)}</div>
     <div class="v">${fmt(v)} <small>${cellDays(v)}${est ? ' (estimated)' : ''}</small></div>
     <div class="d">${badge}</div>
     <div class="d">A normal ${MONTHS_LONG[c]} here has ${fmt(med)}.${rank ? ` This one is ${rank}.` : ''}${gap}${prelim}</div></div>`;
@@ -110,6 +121,16 @@ function renderSummary() {
     const base = !Number.isFinite(er) ? '' : er > e + 0.005 ? ` Plain monthly conversion factors would miss by ±${Math.round(100 * er)} %.` : er < e - 0.005 ? ` Here plain monthly conversion factors do better (±${Math.round(100 * er)} %), so read the older years with extra care.` : ` Here plain monthly conversion factors do about as well (±${Math.round(100 * er)} %).`;
     h += `<div class="stat"><div class="k">How reliable are the years before 2012?</div><div class="v">±${Math.round(100 * e)} % <small>typical miss of a yearly total</small></div>
       <div class="d">Measured by hiding each year of 2012 to ${P.lastYear} and predicting it from MODIS alone.${base}${D.lowEvidence ? ' MODIS saw very few fires here, so treat the years before 2012 as a rough guide only.' : ''}</div></div>`;
+  }
+  const T = D.trend;
+  if (T) {
+    // slope per year, in cell-days and as a share of a typical (median) year
+    const py = Math.round(10 * T.perDecade);
+    const clear = T.p < 0.05 && Math.abs(T.slope) > 0;
+    const amount = `${fmt(Math.abs(T.slope))} cell-days per year${Number.isFinite(py) && py !== 0 ? ` (${Math.abs(py)} % of a typical year)` : ''}`;
+    const word = !clear ? '● No clear trend' : T.slope > 0 ? `▲ Rising by ${amount}` : `▼ Falling by ${amount}`;
+    h += `<div class="stat"><div class="k">Long-term trend · ${D.trendYears[0]} to ${D.trendYears[1]}</div><div class="v" style="font-size:19px">${word}</div>
+      <div class="d">${clear ? 'The direction is unlikely to be chance' : 'Ups and downs, but no direction that stands out from chance'} (Mann-Kendall test, p ${T.p < 0.001 ? '< 0.001' : '= ' + T.p.toFixed(2)}; Theil-Sen slope over ${T.n} complete years).</div></div>`;
   }
   $('summary').innerHTML = h;
 }
@@ -134,11 +155,12 @@ function renderAll() {
   for (const id of ['calendar-card']) $(id).style.display = has ? '' : 'none';
   document.querySelectorAll('main > .grid2').forEach((el) => { el.style.display = has ? '' : 'none'; });
   if (!has) return;
-  $('cal-sub').textContent = `${area.name}: fire activity for every month from November 2000 to ${MONTHS_LONG[(P.nMonths - 1) % 12]} ${2000 + Math.floor((P.nMonths - 1) / 12)}, in one unit. Hover a month for details, click it to see its fires on the map.`;
+  const ml = (m) => `${MONTHS_LONG[m % 12]} ${2000 + Math.floor(m / 12)}`;
+  $('cal-sub').textContent = `${area.name}: fire activity for every month from ${ml(D.firstM)} to ${ml(D.lastM)}, in one unit. Hover a month for details, click it to see its fires on the map.`;
   renderCalendar($('calendar'), D, { mode: state.calMode, selMonth: state.selMonth });
   $('year-sub').textContent = 'MODIS alone under-counts small fires and VIIRS only starts in 2012. The harmonized record joins both in VIIRS units.';
   renderRecords($('chart-years'), D);
-  const year = state.selMonth >= 0 ? 2000 + Math.floor(state.selMonth / 12) : P.lastYear;
+  const year = 2000 + Math.floor((state.selMonth >= 0 ? state.selMonth : D.lastM) / 12);
   $('season-sub').textContent = `When fire normally happens here, and how ${year} compared. Click any month in the calendar to change the year.`;
   renderSeason($('chart-season'), D, year);
   const e = D.cv.yearlyError;
@@ -168,12 +190,28 @@ function setArea(area, { fit = true, keepMonth = false } = {}) {
   const inside = area.type === 'box' ? inBox(...area.box) : area.type === 'poly' ? inPolygon(area.ring) : null;
   state.area = area;
   if (!keepMonth) state.selMonth = -1;
-  state.D = derive(P, inside ? harmonize(P, inside) : state.countryFit);
+  state.res = inside ? harmonize(P, inside) : state.countryFit;
+  state.D = derive(P, state.res, state.range);
   mapApi.setArea(area, state.D.idx, fit);
   mapApi.setMonth(state.selMonth);
   const preset = $('preset');
   preset.value = area.presetId || (area.type === 'country' ? '__country' : '__custom');
   if (area.type === 'box') for (const [k, i] of [['s', 0], ['w', 1], ['n', 2], ['e', 3]]) $('coords').elements[k].value = area.box[i];
+  renderAll();
+  renderLegend();
+  writeHash();
+}
+
+function setRange(y0, y1) {
+  if (y0 > y1) [y0, y1] = [y1, y0];
+  state.range = [y0, y1];
+  $('y0').value = y0;
+  $('y1').value = y1;
+  const sy = 2000 + Math.floor(state.selMonth / 12);
+  if (state.selMonth >= 0 && (sy < y0 || sy > y1)) state.selMonth = -1;
+  state.D = derive(state.P, state.res, state.range);
+  mapApi.setArea(state.area, state.D.idx, false);
+  mapApi.setMonth(state.selMonth);
   renderAll();
   renderLegend();
   writeHash();
@@ -189,7 +227,7 @@ function selectMonth(m) {
 
 function renderLegend() {
   const m = state.selMonth;
-  $('map-legend').innerHTML = `<span><i style="background:#ff7a1a"></i>Fires in your area, 2000 to ${state.P.lastYear}</span><span><i style="background:rgba(240,138,60,.4)"></i>Fires elsewhere</span>`
+  $('map-legend').innerHTML = `<span><i style="background:#ff7a1a"></i>Fires in your area, ${state.D.range[0]} to ${state.D.range[1]}</span><span><i style="background:rgba(240,138,60,.4)"></i>Fires elsewhere</span>`
     + (m >= 0 ? `<span><i style="background:#fff3b0;border:1px solid #7a2a00"></i>${MONTHS[m % 12]} ${2000 + Math.floor(m / 12)}</span>` : '')
     + ($('chk-static').checked ? '<span><i style="background:#60c4ff"></i>Removed: gas flares, industry</span>' : '');
 }
@@ -200,6 +238,7 @@ function writeHash() {
   if (a.presetId) parts.push(`area=${a.presetId}`);
   else if (a.type === 'box') parts.push(`box=${a.box.join(',')}`);
   else if (a.type === 'poly') parts.push(`poly=${a.ring.map((p) => p.join(',')).join(';')}`);
+  if (state.D.range[0] > 2000 || state.D.range[1] < state.P.lastYear) parts.push(`y=${state.D.range[0]}-${state.D.range[1]}`);
   if (state.selMonth >= 0) parts.push(`m=${2000 + Math.floor(state.selMonth / 12)}-${String((state.selMonth % 12) + 1).padStart(2, '0')}`);
   lastHash = '#' + parts.join('&');
   history.replaceState(null, '', lastHash);
@@ -226,6 +265,7 @@ function readHash() {
     if (ring.length >= 3 && ring.length <= 200 && ring.every((p) => p.length === 2 && okLat(p[0]) && okLon(p[1]))) out.area = { type: 'poly', ring, name: 'Custom polygon' };
   }
   if (q.area) out.presetId = q.area;
+  if (q.y && /^(20\d\d)-(20\d\d)$/.test(q.y)) out.range = q.y.split('-').map(Number).sort((p, r) => p - r);
   if (q.m && /^\d{4}-(0[1-9]|1[0-2])$/.test(q.m)) out.month = (+q.m.slice(0, 4) - 2000) * 12 + (+q.m.slice(5) - 1);
   return out;
 }
@@ -251,6 +291,14 @@ async function loadCountry(id, initial = {}) {
   state.selMonth = -1;
   state.P = decodePack(pack);
   state.countryFit = harmonize(state.P);
+  const ys = [];
+  for (let y = 2000; y <= state.P.lastYear; y++) ys.push(`<option value="${y}">${y}</option>`);
+  $('y0').innerHTML = ys.join('');
+  $('y1').innerHTML = ys.join('');
+  const r = initial.range && initial.range[0] <= state.P.lastYear ? [Math.max(2000, initial.range[0]), Math.min(state.P.lastYear, initial.range[1])] : [2000, state.P.lastYear];
+  state.range = r;
+  $('y0').value = r[0];
+  $('y1').value = r[1];
   mapApi.setPack(state.P, meta.places);
   const preset = $('preset');
   preset.innerHTML = meta.presets.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')
@@ -261,7 +309,7 @@ async function loadCountry(id, initial = {}) {
     const p = meta.presets.find((x) => x.id === initial.presetId) || (initial.presetId === '__country' ? null : meta.presets[0]);
     area = p ? presetArea(p) : { type: 'country', name: meta.name, presetId: '__country' };
   }
-  if (initial.month >= ERA.TERRA_START && initial.month < state.P.nMonths) state.selMonth = initial.month;
+  if (initial.month >= ERA.TERRA_START && initial.month < state.P.nMonths && 2000 + Math.floor(initial.month / 12) >= state.range[0] && 2000 + Math.floor(initial.month / 12) <= state.range[1]) state.selMonth = initial.month;
   setArea(area, { keepMonth: true });
   renderLegend();
 }
@@ -295,6 +343,42 @@ function cellsCsv() {
   const lines = ['date,lat_center,lon_center,sensors,night_detection,max_frp_mw'];
   for (const i of D.idx) lines.push([dayToISO(P.day[i]), (P.a[i] / P.res + half).toFixed(3), (P.b[i] / P.res + half).toFixed(3), sensorNames(P.f[i]), P.f[i] & FLAG.NIGHT ? 1 : 0, P.frp[i]].join(','));
   return lines.join('\n') + '\n';
+}
+
+/** The calendar as a PNG image (title, calendar, credit), ready for a report or a slide. */
+function calendarPng() {
+  const svg = document.querySelector('#calendar svg');
+  if (!svg) return;
+  const vb = svg.viewBox.baseVal;
+  const top = 64;
+  const bottom = 46;
+  const W = vb.width;
+  const HT = vb.height + top + bottom;
+  const D = state.D;
+  const title = `${state.area.name}, ${state.country.name}: burning calendar ${D.range[0]} to ${D.range[1]}`;
+  const what = state.calMode === 'anomaly' ? 'Colour: each month ranked against the same month of the other years (blue = fewer fires than normal, red = more)' : `Colour: harmonized burning cell-days per month (dark = none, bright = ${fmt(D.vmax)} or more)`;
+  const css = 'text{font-family:Segoe UI,Arial,sans-serif;fill:#b6bcc6}.axis{fill:#808896;font-size:11.5px}.lbl{fill:#b6bcc6;font-size:12px}.val{fill:#eef0f2;font-size:12px}';
+  const src = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${HT}" width="${W * 2}" height="${HT * 2}"><style>${css}</style><rect width="${W}" height="${HT}" fill="#171a1f"/>`
+    + `<text x="18" y="30" style="font-size:19px;font-weight:600;fill:#eef0f2">${esc(title)}</text><text x="18" y="50" style="font-size:12px;fill:#b6bcc6">${esc(what)}</text>`
+    + `<g transform="translate(0,${top})">${svg.innerHTML}</g>`
+    + `<text x="18" y="${HT - 16}" style="font-size:11.5px;fill:#808896">Nar Calendar (nar.vorelq.com) · harmonized MODIS + VIIRS S-NPP active fires · data: NASA FIRMS · blue bars = estimated from MODIS, orange bars = observed by VIIRS</text></svg>`;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = W * 2;
+    c.height = HT * 2;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    c.toBlob((blob) => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `nar-calendar_${slug()}_${D.range[0]}-${D.range[1]}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    }, 'image/png');
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
 }
 
 // ---------------------------------------------------------------- tooltip
@@ -375,6 +459,9 @@ async function main() {
   $('calendar').addEventListener('click', (ev) => { const c = ev.target.closest('.cell'); if (c) selectMonth(+c.dataset.m); });
   $('table-months').addEventListener('click', (ev) => { const r = ev.target.closest('tr[data-m]'); if (r) { selectMonth(+r.dataset.m); $('map').scrollIntoView({ behavior: 'smooth', block: 'center' }); } });
   $('dl-monthly').addEventListener('click', () => download(`nar-calendar_${slug()}_monthly.csv`, monthlyCsv()));
+  $('y0').addEventListener('change', () => setRange(+$('y0').value, +$('y1').value));
+  $('y1').addEventListener('change', () => setRange(+$('y0').value, +$('y1').value));
+  $('dl-png').addEventListener('click', () => calendarPng());
   $('dl-cells').addEventListener('click', () => download(`nar-calendar_${slug()}_fire-cell-days.csv`, cellsCsv()));
   $('copy-link').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText(location.href); $('dl-note').textContent = 'Link copied. Anyone who opens it sees this exact area.'; } catch { $('dl-note').textContent = location.href; }

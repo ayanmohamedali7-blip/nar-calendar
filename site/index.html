@@ -65,9 +65,12 @@
         <h2>Burning calendar</h2>
         <p class="sub" id="cal-sub"></p>
       </div>
+      <div class="cal-controls">
+      <label class="field">Years <select id="y0" aria-label="First year"></select> to <select id="y1" aria-label="Last year"></select></label>
       <div class="seg" role="group" aria-label="Calendar colours">
         <button type="button" data-mode="activity" class="on">Fire activity</button>
         <button type="button" data-mode="anomaly">Compared with normal</button>
+      </div>
       </div>
     </div>
     <div id="calendar"></div>
@@ -107,10 +110,11 @@
     </div>
     <div class="card">
       <h2>Take the data</h2>
-      <p class="sub">Everything on this page for the selected area, as plain CSV files.</p>
+      <p class="sub">Everything on this page for the selected area and years: plain CSV files and the calendar as an image.</p>
       <div class="downloads">
         <button type="button" class="primary" id="dl-monthly">Monthly series (CSV)</button>
         <button type="button" id="dl-cells">Fire cell-days (CSV)</button>
+        <button type="button" id="dl-png">Calendar image (PNG)</button>
         <button type="button" id="copy-link">Copy link to this area</button>
       </div>
       <p class="note" id="dl-note"></p>

@@ -344,6 +344,37 @@ export function percentileOf(H, m) {
   return n ? below / n : NaN;
 }
 
+/**
+ * Trend of a yearly series: Theil-Sen slope (median of all pairwise slopes, robust to single
+ * extreme years) and the Mann-Kendall test with tie correction (is the direction more than chance?).
+ */
+export function trend(values) {
+  const n = values.length;
+  if (n < 8) return null;
+  const slopes = [];
+  let S = 0;
+  for (let i = 0; i < n - 1; i++) {
+    for (let j = i + 1; j < n; j++) {
+      slopes.push((values[j] - values[i]) / (j - i));
+      S += Math.sign(values[j] - values[i]);
+    }
+  }
+  slopes.sort((p, q) => p - q);
+  const slope = quantile(slopes, 0.5);
+  const ties = new Map();
+  for (const v of values) ties.set(v, (ties.get(v) || 0) + 1);
+  let varS = (n * (n - 1) * (2 * n + 5)) / 18;
+  for (const t of ties.values()) if (t > 1) varS -= (t * (t - 1) * (2 * t + 5)) / 18;
+  const z = varS > 0 ? (S > 0 ? (S - 1) / Math.sqrt(varS) : S < 0 ? (S + 1) / Math.sqrt(varS) : 0) : 0;
+  // two-sided p-value from the normal distribution (Abramowitz-Stegun 7.1.26)
+  const x = Math.abs(z) / Math.SQRT2;
+  const k = 1 / (1 + 0.3275911 * x);
+  const erf = 1 - (((((1.061405429 * k - 1.453152027) * k + 1.421413741) * k - 0.284496736) * k + 0.254829592) * k) * Math.exp(-x * x);
+  const p = 1 - erf;
+  const med = quantile([...values].sort((p1, q1) => p1 - q1), 0.5);
+  return { n, slope, perDecade: med > 0 ? (slope * 10) / med : NaN, p, z };
+}
+
 // ---- geometry helpers ----
 export const inBox = (s, w, n, e) => (lat, lon) => lat >= s && lat <= n && lon >= w && lon <= e;
 
