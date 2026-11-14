@@ -148,6 +148,8 @@ export function createMap(el, { onArea, onDrawState }) {
   }
   map.on('click', (ev) => {
     if (!mode) return;
+    // a second click on the same spot (the two clicks of a double-click) is not a new corner
+    if (pts.length && map.latLngToContainerPoint(pts[pts.length - 1]).distanceTo(ev.containerPoint) < 6) return;
     if (mode === 'rect') {
       pts.push(ev.latlng);
       if (pts.length === 1) onDrawState('Now click the opposite corner');

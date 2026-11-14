@@ -1,7 +1,7 @@
 // Nar Calendar: application wiring (state, summary cards, tables, downloads).
 import { decodePack, harmonize, climatology, percentileOf, inBox, inPolygon, dayToISO, ERA, FLAG } from './harmonize.js';
 import { createMap, sensorNames } from './map.js';
-import { renderCalendar, renderRecords, renderSeason, renderValidation, renderFunnel, MONTHS, MONTHS_LONG, fmt, ordinal, esc } from './charts.js';
+import { renderCalendar, renderRecords, renderSeason, renderValidation, renderFunnel, rankPhrase, MONTHS, MONTHS_LONG, fmt, esc } from './charts.js';
 
 const $ = (id) => document.getElementById(id);
 const state = { index: null, country: null, P: null, countryFit: null, area: null, D: null, selMonth: -1, calMode: 'activity' };
@@ -14,12 +14,17 @@ function derive(P, res) {
   const clim = climatology(H, N);
   const pct = new Float64Array(N).fill(NaN);
   const rankAbove = new Int16Array(N);
+  const rankTie = new Uint8Array(N); // another year has exactly the same value
   const finite = [];
   for (let m = 0; m < N; m++) {
     if (!Number.isFinite(H[m])) continue;
     finite.push(H[m]);
     pct[m] = percentileOf(H, m);
-    for (let j = m % 12; j < N; j += 12) if (j !== m && H[j] > H[m]) rankAbove[m]++;
+    for (let j = m % 12; j < N; j += 12) {
+      if (j === m || !Number.isFinite(H[j])) continue;
+      if (H[j] > H[m]) rankAbove[m]++;
+      else if (H[j] === H[m]) rankTie[m] = 1;
+    }
   }
   finite.sort((p, q) => p - q);
   const vmax = Math.max(3, finite[Math.floor(0.98 * (finite.length - 1))] || 0);
@@ -41,8 +46,12 @@ function derive(P, res) {
     Y.hi = Y.total - Y.modelled + Y.modelled * Math.max(1, yb[1]);
     years.push(Y);
   }
-  return { ...res, clim, pct, rankAbove, vmax, years, total: finite.reduce((s, v) => s + v, 0) };
+  return { ...res, clim, pct, rankAbove, rankTie, vmax, years, total: finite.reduce((s, v) => s + v, 0) };
 }
+
+const cellDays = (v) => (fmt(v) === '1' ? 'burning cell-day' : 'burning cell-days');
+const degLat = (v) => `${Math.abs(v)}° ${v < 0 ? 'S' : 'N'}`;
+const degLon = (v) => `${Math.abs(v)}° ${v < 0 ? 'W' : 'E'}`;
 
 function seasonText(med) {
   const max = Math.max(...med);
@@ -61,10 +70,11 @@ function seasonText(med) {
 function renderSummary() {
   const { D, area, P } = state;
   const box = area.type === 'box' ? area.box : null;
-  const where = area.type === 'country' ? 'Whole country' : box ? `${box[0]}° to ${box[2]}° N, ${box[1]}° to ${box[3]}° E` : `Polygon with ${area.ring.length} corners`;
-  let h = `<div><div class="area-name">${esc(area.name)}</div><div class="area-meta">${where} · ${D.idx.length.toLocaleString('en-US')} burning cell-days on record</div></div>`;
+  const where = area.type === 'country' ? 'Whole country' : box ? `${degLat(box[0])} to ${degLat(box[2])}, ${degLon(box[1])} to ${degLon(box[3])}` : `Polygon with ${area.ring.length} corners`;
+  let h = `<div><div class="area-name">${esc(area.name)}</div><div class="area-meta">${where} · ${D.idx.length.toLocaleString('en-US')} burning cell-days on record in ${esc(state.country.name)}</div></div>`;
   if (!D.idx.length) {
-    $('summary').innerHTML = h + '<div class="empty">No vegetation fire has been detected in this area since 2000. Try a larger area or one of the ready-made areas.</div>';
+    const others = state.index.countries.filter((c) => c.id !== state.country.id).map((c) => c.name).join(', ');
+    $('summary').innerHTML = h + `<div class="empty">No vegetation fire has been detected in this area since 2000 inside ${esc(state.country.name)}. This page counts one country at a time: if your area lies in ${esc(others)}, choose that country at the top. Otherwise try a larger area or one of the ready-made areas.</div>`;
     return;
   }
   const m = state.selMonth >= 0 ? state.selMonth : D.N - 1;
@@ -77,11 +87,13 @@ function renderSummary() {
     const d = Math.round((100 * (v - med)) / med);
     // less than one cell-day away from normal is not an anomaly, whatever the percentage
     badge = Math.abs(d) < 15 || Math.abs(v - med) < 1 ?'<span class="badge flat">● Close to normal</span>' : d > 0 ? `<span class="badge up">▲ ${d.toLocaleString('en-US')} % above normal</span>` : `<span class="badge down">▼ ${-d} % below normal</span>`;
-  } else badge = v > 0 ? '<span class="badge up">▲ Fire in a month that is normally quiet</span>' : '<span class="badge flat">● Quiet, as normal</span>';
+  } else badge = v >= 1 ? '<span class="badge up">▲ Fire in a month that is normally quiet</span>' : '<span class="badge flat">● Quiet, as normal</span>';
+  const rank = rankPhrase(D, m);
+  const gap = D.gapDays[m] > 0 && !est ? ` The satellite was out for ${D.gapDays[m]} days this month, so the count is scaled up to a full month.` : '';
   h += `<div class="stat"><div class="k">${state.selMonth >= 0 ? 'Selected month' : 'Latest month on record'} · ${MONTHS_LONG[c]} ${2000 + Math.floor(m / 12)}</div>
-    <div class="v">${fmt(v)} <small>burning cell-days${est ? ' (estimated)' : ''}</small></div>
+    <div class="v">${fmt(v)} <small>${cellDays(v)}${est ? ' (estimated)' : ''}</small></div>
     <div class="d">${badge}</div>
-    <div class="d">A normal ${MONTHS_LONG[c]} here has ${fmt(med)}. This one is ${1 + D.rankAbove[m] === 1 ? "the" : "the " + ordinal(1 + D.rankAbove[m])} highest of ${D.clim.count[c]} years.</div></div>`;
+    <div class="d">A normal ${MONTHS_LONG[c]} here has ${fmt(med)}.${rank ? ` This one is ${rank}.` : ''}${gap}</div></div>`;
   const season = seasonText([...D.clim.med]);
   const full = D.years.filter((y) => y.months === 12);
   const top = [...full].sort((p, q) => q.total - p.total)[0];
@@ -89,9 +101,14 @@ function renderSummary() {
     <div class="stat"><div class="k">Most active year</div><div class="v" style="font-size:19px">${top.year}</div><div class="d">${fmt(top.total)} cell-days${top.observed ? '' : ' (estimated)'}</div></div></div>`;
   const e = D.cv.yearlyError;
   const er = D.cv.yearlyErrorRatio;
-  if (Number.isFinite(e)) {
+  if (D.overlap.SV < 30 || !Number.isFinite(e)) {
+    // too few fires since 2012 to measure anything
+    h += `<div class="stat"><div class="k">How reliable are the years before 2012?</div><div class="v" style="font-size:19px">Too few fires to measure</div>
+      <div class="d">This area has only ${fmt(D.overlap.SV)} burning cell-days since 2012. Treat the years before 2012 as a rough guide, or draw a larger area.</div></div>`;
+  } else {
+    const base = !Number.isFinite(er) ? '' : er > e + 0.005 ? ` Plain monthly conversion factors would miss by ±${Math.round(100 * er)} %.` : er < e - 0.005 ? ` Here plain monthly conversion factors do better (±${Math.round(100 * er)} %), so read the older years with extra care.` : ` Here plain monthly conversion factors do about as well (±${Math.round(100 * er)} %).`;
     h += `<div class="stat"><div class="k">How reliable are the years before 2012?</div><div class="v">±${Math.round(100 * e)} % <small>typical miss of a yearly total</small></div>
-      <div class="d">Measured by hiding each year of 2012 to ${P.lastYear} and predicting it from MODIS alone.${Number.isFinite(er) && er > e ? ` A single conversion factor would miss by ±${Math.round(100 * er)} %.` : ''}${D.lowEvidence ? ' MODIS saw very few fires here, so treat the years before 2012 as a rough guide only.' : ''}</div></div>`;
+      <div class="d">Measured by hiding each year of 2012 to ${P.lastYear} and predicting it from MODIS alone.${base}${D.lowEvidence ? ' MODIS saw very few fires here, so treat the years before 2012 as a rough guide only.' : ''}</div></div>`;
   }
   $('summary').innerHTML = h;
 }
@@ -157,6 +174,7 @@ function setArea(area, { fit = true, keepMonth = false } = {}) {
   preset.value = area.presetId || (area.type === 'country' ? '__country' : '__custom');
   if (area.type === 'box') for (const [k, i] of [['s', 0], ['w', 1], ['n', 2], ['e', 3]]) $('coords').elements[k].value = area.box[i];
   renderAll();
+  renderLegend();
   writeHash();
 }
 
@@ -186,14 +204,28 @@ function writeHash() {
   history.replaceState(null, '', lastHash);
 }
 
+/** Is this hash one of ours (as opposed to an in-page anchor such as #method)? */
+const isStateHash = (h) => /^#(c|box|poly|area|m)=/.test(h);
+
 function readHash() {
-  const q = Object.fromEntries(location.hash.slice(1).split('&').filter(Boolean).map((kv) => kv.split('=')));
+  let raw = location.hash.slice(1);
+  try { raw = decodeURIComponent(raw); } catch { /* keep the raw text */ }
+  const q = Object.fromEntries(raw.split('&').filter(Boolean).map((kv) => { const i = kv.indexOf('='); return i < 0 ? [kv, ''] : [kv.slice(0, i), kv.slice(i + 1)]; }));
   const out = { country: q.c, month: -1, area: null };
-  const num = (s) => s.split(',').map(Number);
-  if (q.box) { const b = num(q.box); if (b.length === 4 && b.every(Number.isFinite) && b[2] > b[0] && b[3] > b[1]) out.area = { type: 'box', box: b, name: 'Custom rectangle' }; }
-  if (q.poly) { const ring = q.poly.split(';').map(num); if (ring.length >= 3 && ring.every((p) => p.length === 2 && p.every(Number.isFinite))) out.area = { type: 'poly', ring, name: 'Custom polygon' }; }
+  // strict numbers only: "" and "abc" are rejected, coordinates must be on the globe
+  const num = (s) => s.split(',').map((t) => (/^-?\d+(\.\d+)?$/.test(t.trim()) ? Number(t) : NaN));
+  const okLat = (v) => Number.isFinite(v) && v >= -90 && v <= 90;
+  const okLon = (v) => Number.isFinite(v) && v >= -180 && v <= 180;
+  if (q.box) {
+    const b = num(q.box);
+    if (b.length === 4 && okLat(b[0]) && okLat(b[2]) && okLon(b[1]) && okLon(b[3]) && b[2] > b[0] && b[3] > b[1]) out.area = { type: 'box', box: b, name: 'Custom rectangle' };
+  }
+  if (q.poly) {
+    const ring = q.poly.split(';').map(num);
+    if (ring.length >= 3 && ring.length <= 200 && ring.every((p) => p.length === 2 && okLat(p[0]) && okLon(p[1]))) out.area = { type: 'poly', ring, name: 'Custom polygon' };
+  }
   if (q.area) out.presetId = q.area;
-  if (q.m && /^\d{4}-\d{2}$/.test(q.m)) out.month = (+q.m.slice(0, 4) - 2000) * 12 + (+q.m.slice(5) - 1);
+  if (q.m && /^\d{4}-(0[1-9]|1[0-2])$/.test(q.m)) out.month = (+q.m.slice(0, 4) - 2000) * 12 + (+q.m.slice(5) - 1);
   return out;
 }
 
@@ -201,9 +233,21 @@ const presetArea = (p) => ({ type: 'box', box: p.box, name: p.name, presetId: p.
 
 async function loadCountry(id, initial = {}) {
   const meta = state.index.countries.find((c) => c.id === id) || state.index.countries[0];
+  let pack;
+  try {
+    const res = await fetch(`data/${meta.file}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    pack = await res.json();
+  } catch (err) {
+    console.error(err);
+    if (state.country) $('country').value = state.country.id; // stay on the country that is loaded
+    $('dl-note').textContent = `The data for ${meta.name} could not be loaded. Check your connection and try again.`;
+    if (!state.country) throw err;
+    return;
+  }
   state.country = meta;
   $('country').value = meta.id;
-  const pack = await (await fetch(`data/${meta.file}`)).json();
+  state.selMonth = -1;
   state.P = decodePack(pack);
   state.countryFit = harmonize(state.P);
   mapApi.setPack(state.P, meta.places);
@@ -236,11 +280,11 @@ const slug = () => `${state.country.id}_${state.area.name.toLowerCase().replace(
 function monthlyCsv() {
   const D = state.D;
   const r = (v) => (Number.isFinite(v) ? (Math.round(v * 100) / 100).toString() : '');
-  const lines = ['year,month,harmonized_cell_days,likely_low,likely_high,source,modis_cell_days,viirs_cell_days,median_same_month,percentile_rank'];
+  const lines = ['year,month,harmonized_cell_days,likely_low,likely_high,source,modis_cell_days,viirs_cell_days,sensor_coverage,median_same_month,percentile_rank'];
   for (let m = 0; m < D.N; m++) {
     if (!Number.isFinite(D.H[m])) continue;
     const src = D.src[m] === 'VIIRS' ? 'VIIRS_observed' : D.src[m] === 'Terra' ? 'MODIS_Terra_converted' : 'MODIS_converted';
-    lines.push([2000 + Math.floor(m / 12), (m % 12) + 1, r(D.H[m]), r(D.lo[m]), r(D.hi[m]), src, D.M[m], m >= 144 ? D.V[m] : '', r(D.clim.med[m % 12]), r(D.pct[m])].join(','));
+    lines.push([2000 + Math.floor(m / 12), (m % 12) + 1, r(D.H[m]), r(D.lo[m]), r(D.hi[m]), src, D.M[m], m >= 144 ? D.V[m] : '', r(D.cov[m]), r(D.clim.med[m % 12]), r(D.pct[m])].join(','));
   }
   return lines.join('\n') + '\n';
 }
@@ -288,7 +332,7 @@ async function main() {
   mapApi.map.setView([28, 17], 5);
   initTooltip();
 
-  $('country').addEventListener('change', (ev) => loadCountry(ev.target.value));
+  $('country').addEventListener('change', (ev) => { loadCountry(ev.target.value).catch((err) => console.error(err)); });
   $('preset').addEventListener('change', (ev) => {
     const v = ev.target.value;
     if (v === '__country') setArea({ type: 'country', name: state.country.name, presetId: '__country' });
@@ -330,10 +374,17 @@ async function main() {
   // a pasted or edited link on the open page
   window.addEventListener('hashchange', () => {
     if (location.hash === lastHash) return;
+    if (!isStateHash(location.hash)) { history.replaceState(null, '', lastHash); return; } // an in-page anchor, not an area
     const h = readHash();
-    state.selMonth = -1;
     loadCountry(h.country || state.country.id, h);
   });
+  // in-page links scroll without touching the area stored in the address
+  document.querySelectorAll('a[href^="#"]').forEach((a) => a.addEventListener('click', (ev) => {
+    const target = document.getElementById(a.getAttribute('href').slice(1));
+    if (!target) return;
+    ev.preventDefault();
+    target.scrollIntoView({ behavior: 'smooth' });
+  }));
 }
 
 main().catch((err) => {

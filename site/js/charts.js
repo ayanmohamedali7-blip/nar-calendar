@@ -31,14 +31,22 @@ export function fmt(v) {
   if (!Number.isFinite(v)) return 'n/a';
   if (v >= 100) return Math.round(v).toLocaleString('en-US');
   if (v >= 10 || Number.isInteger(v)) return String(Math.round(v));
-  return (Math.round(v * 10) / 10).toFixed(1);
+  const t = (Math.round(v * 10) / 10).toFixed(1);
+  return t === '0.0' ? '0' : t;
 }
 export const ordinal = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
 const row = (k, v) => `<div class="row"><span>${k}</span><span>${v}</span></div>`;
 const tip = (html) => `data-tip="${esc(html)}"`;
 
+/** "the 3rd highest of 26 years", "the joint highest of 26 years"; empty for months without fire. */
+export function rankPhrase(D, m) {
+  if (!(D.H[m] >= 0.5)) return '';
+  const r = 1 + D.rankAbove[m];
+  return `the ${D.rankTie[m] ? 'joint ' : ''}${r === 1 ? '' : ordinal(r) + ' '}highest of ${D.clim.count[m % 12]} years`;
+}
+
 function niceMax(v) {
-  if (!(v > 0)) return 1;
+  if (!(v > 4)) return 4; // counts: never label an axis with fractions of a cell-day
   const p = Math.pow(10, Math.floor(Math.log10(v)));
   for (const m of [1, 1.2, 1.6, 2, 2.4, 3.2, 4, 6, 8, 10]) if (m * p >= v) return m * p; // all divide cleanly by 4 ticks
   return 10 * p;
@@ -88,16 +96,16 @@ export function renderCalendar(el, D, { mode, selMonth }) {
       const v = H[m];
       const fill = mode === 'anomaly' ? anomalyColor(pct[m]) : fireColor(v, vmax);
       const est = src[m] !== 'VIIRS';
-      const n = clim.count[c];
-      const rank = 1 + D.rankAbove[m];
+      const rank = rankPhrase(D, m);
+      const outage = D.gapDays[m] > 0 ? ` Satellite outage: ${D.gapDays[m]} days missing, count scaled to a full month.` : '';
       const html = `<b>${MONTHS_LONG[c]} ${Y.year}</b>`
         + row(est ? 'Estimated activity' : 'Fire activity', `${fmt(v)} cell-days`)
         + (est ? row('Likely range', `${fmt(D.lo[m])} to ${fmt(D.hi[m])}`) : '')
         + row(`Normal for ${MONTHS[c]}`, fmt(clim.med[c]))
-        + row('Rank', `${rank === 1 ? 'Highest' : ordinal(rank) + ' highest'} of ${n}`)
+        + (rank ? row('Rank', rank.replace(/^the /, '').replace(/ years$/, '')) : '')
         + row('MODIS saw', fmt(D.M[m]))
         + (m >= 144 ? row('VIIRS saw', fmt(D.V[m])) : '')
-        + `<div style="margin-top:3px;color:#808896">${est ? (src[m] === 'Terra' ? 'From MODIS Terra only, converted' : 'From MODIS, converted to VIIRS units') : 'VIIRS observation'}. Click to show on the map.</div>`;
+        + `<div style="margin-top:3px;color:#808896">${est ? (src[m] === 'Terra' ? 'From MODIS Terra only, converted' : 'From MODIS, converted to VIIRS units') : 'VIIRS observation'}.${outage} Click to show on the map.</div>`;
       s += `<rect class="cell${m === selMonth ? ' sel' : ''}" data-m="${m}" x="${x}" y="${y}" width="${cw - gap}" height="${rh - gap}" rx="3" fill="${fill}" ${tip(html)}/>`;
     }
     // year total bar

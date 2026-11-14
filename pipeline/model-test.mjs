@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { decodePack, monthlyCounts, fitRatio, fitQuantileMap, inBox, ERA } from '../site/js/harmonize.js';
+import { decodePack, harmonize, fitRatio, fitQuantileMap, inBox, ERA } from '../site/js/harmonize.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const id = process.argv[2] || 'libya';
@@ -41,7 +41,8 @@ function stats(pairs) {
 const show = (tag, y, m) => console.log(`  ${tag}  yearly: miss ${(100 * y.miss).toFixed(0)}%  r=${y.r.toFixed(2)}  spread=${y.spread.toFixed(2)}   | monthly: miss ${(100 * m.miss).toFixed(0)}%  r=${m.r.toFixed(2)}  spread=${m.spread.toFixed(2)}`);
 
 for (const a of [{ name: 'Whole country', box: null }, ...meta.presets]) {
-  const { V, M, N } = monthlyCounts(P, a.box ? inBox(...a.box) : null);
+  const h = harmonize(P, a.box ? inBox(...a.box) : null); // outage-adjusted counts, as in the app
+  const V = h.Va, M = h.Ma, N = h.N;
   const res = { A: [[], []], B: [[], []], Q: [[], []] };
   for (let y = 2012; (y - 2000) * 12 < N; y++) {
     const ratio = fitRatio(V, M, N, y);

@@ -109,6 +109,8 @@ const pack = {
   years: { modis: [Math.min(...yearsBySensor.M), Math.max(...yearsBySensor.M)], viirs: [Math.min(...yearsBySensor.V), Math.max(...yearsBySensor.V)] },
   rules: { dilate: DILATE, persistDays: PERSIST_DAYS, persistMonths: PERSIST_MONTHS, minConfModis: 30 },
   funnel,
+  // satellite outages (inclusive ISO date ranges), from pipeline/find-gaps.mjs
+  gaps: fs.existsSync(path.join(ROOT, 'pipeline', 'sensor-gaps.json')) ? JSON.parse(fs.readFileSync(path.join(ROOT, 'pipeline', 'sensor-gaps.json'), 'utf8')).gaps : { terra: [], aqua: [], viirs: [] },
   n: list.length,
   dd: list.map((o) => { const v = o.d - prev; prev = o.d; return v; }),   // delta-encoded day index
   a: list.map((o) => o.a), b: list.map((o) => o.b), f: list.map((o) => o.f),

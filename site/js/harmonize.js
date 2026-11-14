@@ -16,6 +16,7 @@ export const ERA = {
 };
 export const PRIOR_STRENGTH = 20; // shrinkage weight of the ratio baseline, in MODIS cell-days
 export const SEASON_PRIOR = 2; // shrinkage of the season weights, in months
+export const MIN_COVERAGE = 1 / 3; // outage scaling never multiplies a count by more than 3
 export const MIN_LOCAL_MODIS = 30; // with fewer MODIS cell-days in the overlap the mapping is flagged as weak
 
 /** Decode a country pack (see pipeline/build-data.mjs) into typed arrays. */
@@ -35,7 +36,24 @@ export function decodePack(pack) {
     mi[i] = (t.getUTCFullYear() - 2000) * 12 + t.getUTCMonth();
   }
   const lastYear = Math.max(pack.years.modis[1], pack.years.viirs[1]);
-  return { ...pack, day, a, b, f, frp, mi, nMonths: (lastYear - 2000 + 1) * 12, lastYear };
+  const nMonths = (lastYear - 2000 + 1) * 12;
+  // Sensor outages (pipeline/find-gaps.mjs): share of the days of each month a sensor observed.
+  const coverage = { terra: new Float64Array(nMonths).fill(1), aqua: new Float64Array(nMonths).fill(1), viirs: new Float64Array(nMonths).fill(1) };
+  const missing = { terra: new Int16Array(nMonths), aqua: new Int16Array(nMonths), viirs: new Int16Array(nMonths) };
+  for (const s of Object.keys(coverage)) {
+    for (const [from, to] of (pack.gaps && pack.gaps[s]) || []) {
+      for (let t = Date.parse(from + 'T00:00:00Z'); t <= Date.parse(to + 'T00:00:00Z'); t += DAY_MS) {
+        const dt = new Date(t);
+        const m = (dt.getUTCFullYear() - 2000) * 12 + dt.getUTCMonth();
+        if (m >= 0 && m < nMonths) missing[s][m]++;
+      }
+    }
+    for (let m = 0; m < nMonths; m++) {
+      const days = new Date(Date.UTC(2000 + Math.floor(m / 12), (m % 12) + 1, 0)).getUTCDate();
+      coverage[s][m] = 1 - missing[s][m] / days;
+    }
+  }
+  return { ...pack, day, a, b, f, frp, mi, nMonths, lastYear, coverage, missing };
 }
 
 export const dayToISO = (d) => new Date(EPOCH + d * DAY_MS).toISOString().slice(0, 10);
@@ -114,9 +132,13 @@ export function fitQuantileMap(V, X, N, skipYear = null) {
     const mean = C ? S / C : 0;
     if (mean > 0) for (let c = 0; c < 12; c++) w[c] = (sum[c] + SEASON_PRIOR * mean) / (cnt[c] + SEASON_PRIOR) / mean;
   }
-  const map = (x, c = null) => {
-    if (!table.length) return 0;
-    if (x <= table[0][0]) return table[0][1] * (c === null ? 1 : w[c]);
+  // value of the lowest block in calendar month c; the season weight must not lift
+  // "MODIS saw nothing" above the next level of the table
+  const lowest = (c) => {
+    const v = table[0][1] * (c === null ? 1 : w[c]);
+    return table.length > 1 ? Math.min(v, table[1][1]) : v;
+  };
+  const lookup = (x) => {
     for (let i = 1; i < table.length; i++) {
       if (x <= table[i][0]) {
         const [x0, v0] = table[i - 1];
@@ -126,6 +148,14 @@ export function fitQuantileMap(V, X, N, skipYear = null) {
     }
     const [xl, vl] = table[table.length - 1];
     return xl > 0 ? (vl * x) / xl : vl;
+  };
+  // Two guards keep the mapping sane where the overlap holds few fires (tiny areas):
+  //  - more MODIS fire never gives a lower estimate than "MODIS saw nothing" in the same month;
+  //  - VIIRS sees at least the fires MODIS sees, so the result is never below the MODIS count.
+  const map = (x, c = null) => {
+    if (!table.length) return x;
+    if (x <= table[0][0]) return Math.max(x, lowest(c));
+    return Math.max(x, lowest(c), lookup(x));
   };
   return { map, table, seasonWeights: w };
 }
@@ -217,7 +247,29 @@ export function crossValidate(V, X, N) {
  */
 export function harmonize(P, inside = null) {
   const c = monthlyCounts(P, inside);
-  const { V, M, T, N } = c;
+  const { N } = c;
+  // Sensor outages: a month in which a satellite was down for some days would look quieter than
+  // it was. Counts are scaled to a full month by the share of days observed (at most 3x).
+  // V, M, T stay the raw counts; Va, Ma, Ta are the outage-adjusted ones used below.
+  const cov = new Float64Array(N).fill(1); // coverage of the sensor(s) behind H
+  const gapDays = new Int16Array(N);
+  const Va = new Float64Array(N);
+  const Ma = new Float64Array(N);
+  const Ta = new Float64Array(N);
+  const cv_ = P.coverage;
+  for (let m = 0; m < N; m++) {
+    const cV = cv_ ? cv_.viirs[m] : 1;
+    const cT = cv_ ? cv_.terra[m] : 1;
+    const cM = cv_ ? (m >= ERA.AQUA_START ? (cv_.terra[m] + cv_.aqua[m]) / 2 : cv_.terra[m]) : 1;
+    Va[m] = c.V[m] / Math.max(cV, MIN_COVERAGE);
+    Ma[m] = c.M[m] / Math.max(cM, MIN_COVERAGE);
+    Ta[m] = c.T[m] / Math.max(cT, MIN_COVERAGE);
+    cov[m] = m >= ERA.VIIRS_START ? cV : m >= ERA.AQUA_START ? cM : cT;
+    if (P.missing) gapDays[m] = m >= ERA.VIIRS_START ? P.missing.viirs[m] : m >= ERA.AQUA_START ? Math.max(P.missing.terra[m], P.missing.aqua[m]) : P.missing.terra[m];
+  }
+  const V = Va;
+  const M = Ma;
+  const T = Ta;
   const qm = fitQuantileMap(V, M, N);
   const qt = fitQuantileMap(V, T, N);
   const overlap = fitRatio(V, M, N);
@@ -248,7 +300,7 @@ export function harmonize(P, inside = null) {
   }
   // too few MODIS fires in the overlap = the mapping rests on very little evidence
   const lowEvidence = !(overlap.SX >= MIN_LOCAL_MODIS);
-  return { ...c, H, lo, hi, src, qm, qt, overlap, cv, cvT, lowEvidence };
+  return { ...c, Va, Ma, Ta, cov, gapDays, H, lo, hi, src, qm, qt, overlap, cv, cvT, lowEvidence };
 }
 
 /** Per calendar month: median and quartiles of the harmonized series. */
