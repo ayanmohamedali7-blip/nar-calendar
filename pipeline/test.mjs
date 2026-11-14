@@ -174,7 +174,7 @@ function recount(country) {
   if (!fs.existsSync(dir)) return null;
   const det = [];
   for (const f of fs.readdirSync(dir)) {
-    if (!/^(modis|viirs-snpp)_d{4}_.*.csv$/.test(f)) continue; // NOAA-20 files are handled separately
+    if (!/^(modis|viirs-snpp)_[0-9]{4}_.*[.]csv$/.test(f)) continue; // NOAA-20 files are handled separately
     const viirs = f.startsWith('viirs');
     const [head, ...lines] = fs.readFileSync(path.join(dir, f), 'utf8').trim().split(/\r?\n/);
     const col = head.split(',');
