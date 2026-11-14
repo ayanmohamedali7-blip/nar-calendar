@@ -38,7 +38,10 @@ const CellLayer = L.Layer.extend({
 });
 
 export function createMap(el, { onArea, onDrawState }) {
-  const map = L.map(el, { zoomSnap: 0.25, worldCopyJump: true, attributionControl: true, doubleClickZoom: true, fadeAnimation: false });
+  // On phones a one-finger drag must scroll the page, not trap it inside the map:
+  // there the map moves with two fingers (pinch) and with the + / - buttons.
+  const touch = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  const map = L.map(el, { zoomSnap: 0.25, worldCopyJump: true, attributionControl: true, doubleClickZoom: true, fadeAnimation: false, dragging: !touch });
   // The page scrolls past the map: only zoom with the wheel after the map has been clicked.
   map.scrollWheelZoom.disable();
   map.on('click', () => map.scrollWheelZoom.enable());

@@ -299,9 +299,11 @@ function cellsCsv() {
 // ---------------------------------------------------------------- tooltip
 function initTooltip() {
   const tip = $('tip');
-  document.addEventListener('pointermove', (ev) => {
+  let timer = 0;
+  const hide = () => { tip.hidden = true; clearTimeout(timer); };
+  const show = (ev) => {
     const t = ev.target.closest && ev.target.closest('[data-tip]');
-    if (!t) { tip.hidden = true; return; }
+    if (!t) { hide(); return; }
     tip.innerHTML = t.dataset.tip;
     tip.hidden = false;
     const w = tip.offsetWidth;
@@ -312,8 +314,17 @@ function initTooltip() {
     if (y + hh > innerHeight - 8) y = ev.clientY - hh - 14;
     tip.style.left = Math.max(4, x) + 'px';
     tip.style.top = Math.max(4, y) + 'px';
-  });
-  document.addEventListener('pointerleave', () => { tip.hidden = true; });
+    clearTimeout(timer);
+    if (ev.pointerType !== 'mouse') timer = setTimeout(hide, 5000); // a finger does not "leave": time out instead
+  };
+  document.addEventListener('pointermove', (ev) => { if (ev.pointerType === 'mouse') show(ev); });
+  document.addEventListener('pointerdown', show);
+  // never leave the box hanging over other content
+  window.addEventListener('scroll', hide, { passive: true, capture: true });
+  window.addEventListener('blur', hide);
+  window.addEventListener('resize', hide);
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') hide(); });
+  document.documentElement.addEventListener('pointerleave', hide);
 }
 
 // ---------------------------------------------------------------- start
