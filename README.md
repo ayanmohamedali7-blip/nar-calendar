@@ -2,6 +2,8 @@
 
 **One fire record from two generations of NASA satellites, 2000 to today.**
 
+**Live app: https://nar.vorelq.com**
+
 Team **Sawissi Lab** (Libya) · NASA Space Apps Challenge 2026 · Challenge: *Harmonization of MODIS and VIIRS Hot Spots*
 
 *Nar* (نار) is the Arabic word for fire.
