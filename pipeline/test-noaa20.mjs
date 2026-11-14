@@ -25,7 +25,8 @@ test('at least the home country carries the NOAA-20 record', () => {
 test('NOAA-20 list is well formed: sorted, inside its dates, no duplicate cell-day', () => {
   for (const c of withN20) {
     const q = packs[c.id].n20;
-    assert.equal(q.from, '2018-04-01', c.id);
+    // 'from' is the first day with any NOAA-20 detection: a small country can have none on 1 April
+    assert.ok(q.from >= '2018-04-01' && q.from <= '2018-04-07', c.id + ' from ' + q.from);
     assert.ok(q.through >= '2026-11-01', `${c.id} through ${q.through}`);
     const seen = new Set();
     for (let i = 0; i < q.n; i++) {
