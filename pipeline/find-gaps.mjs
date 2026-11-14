@@ -15,7 +15,7 @@ const seen = { terra: new Set(), aqua: new Set(), viirs: new Set() };
 for (const country of REFERENCE) {
   const dir = path.join(ROOT, 'raw', country);
   for (const f of fs.readdirSync(dir)) {
-    if (!f.endsWith('.csv')) continue;
+    if (!/^(modis|viirs-snpp)_d{4}_.*.csv$/.test(f)) continue; // NOAA-20 files are handled separately
     const lines = fs.readFileSync(path.join(dir, f), 'utf8').split(/\r?\n/);
     const head = lines[0].split(',');
     const iDate = head.indexOf('acq_date');
