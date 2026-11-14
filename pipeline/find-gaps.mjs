@@ -1,7 +1,7 @@
 // Find sensor outages: days on which a satellite delivered no detection of ANY type (fires, gas
 // flares, industry) in several flare-rich countries at once. Gas flares burn every day, so a day
 // without a single hot spot across these countries means the instrument was not observing.
-//   node pipeline/find-gaps.mjs            -> writes pipeline/sensor-gaps.json
+//   node pipeline/find-gaps.mjs [data-through YYYY-MM-DD]   -> writes pipeline/sensor-gaps.json
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REFERENCE = ['Algeria', 'Libya', 'Egypt']; // thousands of static sources between them
 const START = { terra: '2000-11-01', aqua: '2002-07-04', viirs: '2012-01-20' };
-const END = '2025-12-31';
+const END = /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(process.argv[2] || '') ? process.argv[2] : '2025-12-31'; // last day covered by the raw files
 
 const seen = { terra: new Set(), aqua: new Set(), viirs: new Set() };
 for (const country of REFERENCE) {

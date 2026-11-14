@@ -36,7 +36,15 @@ export function decodePack(pack) {
     mi[i] = (t.getUTCFullYear() - 2000) * 12 + t.getUTCMonth();
   }
   const lastYear = Math.max(pack.years.modis[1], pack.years.viirs[1]);
-  const nMonths = (lastYear - 2000 + 1) * 12;
+  // The record ends with the last COMPLETE month. `through` is the last day covered by the data
+  // (packs built from yearly archives only end on 31 December).
+  let nMonths = (lastYear - 2000 + 1) * 12;
+  if (pack.through) {
+    const t = new Date(pack.through + 'T00:00:00Z');
+    const next = new Date(t.getTime() + DAY_MS);
+    const complete = next.getUTCDate() === 1; // `through` is the last day of its month
+    nMonths = (t.getUTCFullYear() - 2000) * 12 + t.getUTCMonth() + (complete ? 1 : 0);
+  }
   // Sensor outages (pipeline/find-gaps.mjs): share of the days of each month a sensor observed.
   const coverage = { terra: new Float64Array(nMonths).fill(1), aqua: new Float64Array(nMonths).fill(1), viirs: new Float64Array(nMonths).fill(1) };
   const missing = { terra: new Int16Array(nMonths), aqua: new Int16Array(nMonths), viirs: new Int16Array(nMonths) };
@@ -53,7 +61,9 @@ export function decodePack(pack) {
       coverage[s][m] = 1 - missing[s][m] / days;
     }
   }
-  return { ...pack, day, a, b, f, frp, mi, nMonths, lastYear, coverage, missing };
+  // first month built from near-real-time detections (no FIRMS type label yet)
+  const prelimFrom = pack.preliminaryFrom ? (+pack.preliminaryFrom.slice(0, 4) - 2000) * 12 + (+pack.preliminaryFrom.slice(5, 7) - 1) : Infinity;
+  return { ...pack, day, a, b, f, frp, mi, nMonths, lastYear, coverage, missing, prelimFrom };
 }
 
 export const dayToISO = (d) => new Date(EPOCH + d * DAY_MS).toISOString().slice(0, 10);
@@ -300,7 +310,7 @@ export function harmonize(P, inside = null) {
   }
   // too few MODIS fires in the overlap = the mapping rests on very little evidence
   const lowEvidence = !(overlap.SX >= MIN_LOCAL_MODIS);
-  return { ...c, Va, Ma, Ta, cov, gapDays, H, lo, hi, src, qm, qt, overlap, cv, cvT, lowEvidence };
+  return { ...c, Va, Ma, Ta, cov, gapDays, prelimFrom: P.prelimFrom ?? Infinity, H, lo, hi, src, qm, qt, overlap, cv, cvT, lowEvidence };
 }
 
 /** Per calendar month: median and quartiles of the harmonized series. */

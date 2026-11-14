@@ -42,6 +42,8 @@ const tip = (html) => `data-tip="${esc(html)}"`;
 export function rankPhrase(D, m) {
   if (!(D.H[m] >= 0.5)) return '';
   const r = 1 + D.rankAbove[m];
+  const n = D.clim.count[m % 12];
+  if (r === n && n > 1) return `the lowest of ${n} years`;
   return `the ${D.rankTie[m] ? 'joint ' : ''}${r === 1 ? '' : ordinal(r) + ' '}highest of ${D.clim.count[m % 12]} years`;
 }
 
@@ -97,6 +99,7 @@ export function renderCalendar(el, D, { mode, selMonth }) {
       const fill = mode === 'anomaly' ? anomalyColor(pct[m]) : fireColor(v, vmax);
       const est = src[m] !== 'VIIRS';
       const rank = rankPhrase(D, m);
+      const prelim = m >= D.prelimFrom ? ' Preliminary: near-real-time data, not yet labelled by FIRMS.' : '';
       const outage = D.gapDays[m] > 0 ? ` Satellite outage: ${D.gapDays[m]} days missing, count scaled to a full month.` : '';
       const html = `<b>${MONTHS_LONG[c]} ${Y.year}</b>`
         + row(est ? 'Estimated activity' : 'Fire activity', `${fmt(v)} cell-days`)
@@ -105,7 +108,7 @@ export function renderCalendar(el, D, { mode, selMonth }) {
         + (rank ? row('Rank', rank.replace(/^the /, '').replace(/ years$/, '')) : '')
         + row('MODIS saw', fmt(D.M[m]))
         + (m >= 144 ? row('VIIRS saw', fmt(D.V[m])) : '')
-        + `<div style="margin-top:3px;color:#808896">${est ? (src[m] === 'Terra' ? 'From MODIS Terra only, converted' : 'From MODIS, converted to VIIRS units') : 'VIIRS observation'}.${outage} Click to show on the map.</div>`;
+        + `<div style="margin-top:3px;color:#808896">${est ? (src[m] === 'Terra' ? 'From MODIS Terra only, converted' : 'From MODIS, converted to VIIRS units') : 'VIIRS observation'}.${outage}${prelim} Click to show on the map.</div>`;
       s += `<rect class="cell${m === selMonth ? ' sel' : ''}" data-m="${m}" x="${x}" y="${y}" width="${cw - gap}" height="${rh - gap}" rx="3" fill="${fill}" ${tip(html)}/>`;
     }
     // year total bar

@@ -122,7 +122,7 @@
     <div class="method-grid">
       <div>
         <h3>1. Two satellites, two rulers</h3>
-        <p>MODIS (on Terra and Aqua) has mapped fire since November 2000 with 1 km pixels. VIIRS (on Suomi NPP) started in January 2012 with 375 m pixels and sees many small fires that MODIS misses. Put side by side, the two records look like a jump in fire in 2012 that never happened.</p>
+        <p>MODIS (on Terra and Aqua) has mapped fire since November 2000 with 1 km pixels. VIIRS (on Suomi NPP) started in January 2012 with 375 m pixels and sees many small fires that MODIS misses. Suomi NPP itself stopped delivering data on 2 November 2026, so the same problem is about to return with its successors. Put side by side, the two records look like a jump in fire in 2012 that never happened.</p>
       </div>
       <div>
         <h3>2. Keep only real fires</h3>
@@ -134,7 +134,7 @@
       </div>
       <div>
         <h3>4. Learn the link where both fly</h3>
-        <p>From 2012 to 2025 both sensors watched the same land. For your area we rank all those months twice, once by MODIS and once by VIIRS, and match the ranks: the 10th busiest MODIS month takes the value of the 10th busiest VIIRS month. This is <em>quantile mapping</em>, the technique climate scientists use to join instrument records.</p>
+        <p>From 2012 to 2026 both sensors watched the same land. For your area we rank all those months twice, once by MODIS and once by VIIRS, and match the ranks: the 10th busiest MODIS month takes the value of the 10th busiest VIIRS month. This is <em>quantile mapping</em>, the technique climate scientists use to join instrument records.</p>
       </div>
       <div>
         <h3>5. One series, with honest error bars</h3>
@@ -142,14 +142,14 @@
       </div>
       <div>
         <h3>Limits</h3>
-        <p>Satellites miss fires under cloud and between overpasses. A month where MODIS saw nothing gets the typical small-fire level VIIRS sees in such months, which assumes the years before 2012 resembled 2012 to 2025. A single early month is a rough estimate; yearly totals and the season shape are more reliable.</p>
+        <p>Satellites miss fires under cloud and between overpasses. A month where MODIS saw nothing gets the typical small-fire level VIIRS sees in such months, which assumes the years before 2012 resembled 2012 to 2026. The newest months are near-real-time data and are marked as preliminary. A single early month is a rough estimate; yearly totals and the season shape are more reliable.</p>
       </div>
     </div>
   </section>
 </main>
 
 <footer class="foot">
-  <p><strong>Data:</strong> NASA FIRMS active fire archive (MODIS Collection 6.1, VIIRS S-NPP 375 m). Basemap: NASA GIBS Blue Marble. We acknowledge the use of data from NASA's Fire Information for Resource Management System (FIRMS), part of NASA's Earth Science Data and Information System (ESDIS).</p>
+  <p><strong>Data:</strong> NASA FIRMS active fire archive and API (MODIS Collection 6.1, VIIRS S-NPP 375 m), November 2000 to October 2026. Basemap: NASA GIBS Blue Marble. We acknowledge the use of data from NASA's Fire Information for Resource Management System (FIRMS), part of NASA's Earth Science Data and Information System (ESDIS).</p>
   <p><strong>Team Sawissi Lab</strong>, Libya. NASA Space Apps Challenge 2026, "Harmonization of MODIS and VIIRS Hot Spots". Code written with the help of an AI assistant (Claude, by Anthropic); see the project page for the full disclosure. Not an official NASA product.</p>
 </footer>
 

@@ -113,7 +113,7 @@ test('harmonized series: eras, bands, no NaN where data exist', () => {
       }
       assert.equal(h.src[ERA.TERRA_START], 'Terra');
       assert.equal(h.src[ERA.AQUA_START], 'MODIS');
-      assert.equal(h.cv.years.length, 14);
+      assert.equal(h.cv.years.length, Math.floor((h.N - 1) / 12) + 2000 - 2012 + 1);
       assert.equal(h.cv.years[0].year, 2012);
       assert.ok(Number.isFinite(h.cv.yearlyError));
     }
@@ -180,7 +180,7 @@ function recount(country) {
     const iLat = col.indexOf('latitude'), iLon = col.indexOf('longitude'), iDate = col.indexOf('acq_date'), iSat = col.indexOf('satellite'), iConf = col.indexOf('confidence'), iType = col.indexOf('type');
     for (const line of lines) {
       const c = line.split(',');
-      det.push({ cy: Math.floor(Number(c[iLat]) * 100), cx: Math.floor(Number(c[iLon]) * 100), date: c[iDate], viirs, terra: c[iSat] === 'Terra', type: c[iType], lowConf: viirs ? c[iConf] === 'l' : Number(c[iConf]) < 30 });
+      det.push({ cy: Math.floor(Number(c[iLat]) * 100), cx: Math.floor(Number(c[iLon]) * 100), date: c[iDate], viirs, terra: c[iSat] === 'Terra', type: c[iType] === '' ? '0' : c[iType], lowConf: viirs ? c[iConf] === 'l' : Number(c[iConf]) < 30 });
     }
   }
   const id = (y, x) => `${y}:${x}`;
@@ -229,3 +229,17 @@ for (const c of index.countries) {
     }
   });
 }
+
+test('the record ends with the last complete month', () => {
+  const base = { n: 0, res: 100, years: { modis: [2000, 2026], viirs: [2012, 2026] }, dd: [], a: [], b: [], f: [], frp: [], staticCells: [], persistentCells: [], funnel: {} };
+  assert.equal(decodePack({ ...base, through: '2026-10-31' }).nMonths, 322); // Jan 2000 .. Oct 2026
+  assert.equal(decodePack({ ...base, through: '2026-11-13' }).nMonths, 322); // November is not complete
+  assert.equal(decodePack({ ...base, through: '2025-12-31', years: { modis: [2000, 2025], viirs: [2012, 2025] } }).nMonths, 312);
+  for (const c of index.countries) {
+    const P = packs[c.id];
+    const h = harmonize(P);
+    assert.equal(h.H.length, P.nMonths);
+    assert.ok(Number.isFinite(h.H[P.nMonths - 1]));
+    for (let i = 0; i < P.n; i++) assert.ok(P.mi[i] < P.nMonths, 'no record after the last complete month');
+  }
+});

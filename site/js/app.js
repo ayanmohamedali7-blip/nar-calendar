@@ -89,11 +89,12 @@ function renderSummary() {
     badge = Math.abs(d) < 15 || Math.abs(v - med) < 1 ?'<span class="badge flat">● Close to normal</span>' : d > 0 ? `<span class="badge up">▲ ${d.toLocaleString('en-US')} % above normal</span>` : `<span class="badge down">▼ ${-d} % below normal</span>`;
   } else badge = v >= 1 ? '<span class="badge up">▲ Fire in a month that is normally quiet</span>' : '<span class="badge flat">● Quiet, as normal</span>';
   const rank = rankPhrase(D, m);
+  const prelim = m >= D.prelimFrom ? ' Preliminary: this month comes from near-real-time data that FIRMS has not labelled yet, so a few gas flares may still be counted.' : '';
   const gap = D.gapDays[m] > 0 && !est ? ` The satellite was out for ${D.gapDays[m]} days this month, so the count is scaled up to a full month.` : '';
   h += `<div class="stat"><div class="k">${state.selMonth >= 0 ? 'Selected month' : 'Latest month on record'} · ${MONTHS_LONG[c]} ${2000 + Math.floor(m / 12)}</div>
     <div class="v">${fmt(v)} <small>${cellDays(v)}${est ? ' (estimated)' : ''}</small></div>
     <div class="d">${badge}</div>
-    <div class="d">A normal ${MONTHS_LONG[c]} here has ${fmt(med)}.${rank ? ` This one is ${rank}.` : ''}${gap}</div></div>`;
+    <div class="d">A normal ${MONTHS_LONG[c]} here has ${fmt(med)}.${rank ? ` This one is ${rank}.` : ''}${gap}${prelim}</div></div>`;
   const season = seasonText([...D.clim.med]);
   const full = D.years.filter((y) => y.months === 12);
   const top = [...full].sort((p, q) => q.total - p.total)[0];
@@ -133,7 +134,7 @@ function renderAll() {
   for (const id of ['calendar-card']) $(id).style.display = has ? '' : 'none';
   document.querySelectorAll('main > .grid2').forEach((el) => { el.style.display = has ? '' : 'none'; });
   if (!has) return;
-  $('cal-sub').textContent = `${area.name}: fire activity for every month from November 2000 to December ${P.lastYear}, in one unit. Hover a month for details, click it to see its fires on the map.`;
+  $('cal-sub').textContent = `${area.name}: fire activity for every month from November 2000 to ${MONTHS_LONG[(P.nMonths - 1) % 12]} ${2000 + Math.floor((P.nMonths - 1) / 12)}, in one unit. Hover a month for details, click it to see its fires on the map.`;
   renderCalendar($('calendar'), D, { mode: state.calMode, selMonth: state.selMonth });
   $('year-sub').textContent = 'MODIS alone under-counts small fires and VIIRS only starts in 2012. The harmonized record joins both in VIIRS units.';
   renderRecords($('chart-years'), D);
@@ -154,7 +155,7 @@ function renderFunnelCard() {
   $('funnel-sub').textContent = `${P.country}, both sensors, 2000 to ${P.lastYear}: ${share} % of ${t.raw.toLocaleString('en-US')} satellite hot spots pass our fire filters. The rest are static heat sources such as gas flares and industry, and low-confidence detections. Tick "Show removed gas flares" above the map to see them.`;
   renderFunnel($('chart-funnel'), [
     { label: 'All satellite hot spots', value: t.raw, help: 'Every MODIS and VIIRS detection in the FIRMS archive.' },
-    { label: 'Labelled vegetation fire', value: t.type0, help: 'FIRMS type 0. Types 1 to 3 are volcanoes, static land sources and offshore sources.' },
+    { label: 'Not labelled as static', value: t.type0, help: 'FIRMS type 0 (presumed vegetation fire). Types 1 to 3 are volcanoes, static land sources and offshore sources. The newest months have no label yet and pass this step.' },
     { label: 'Confident detections', value: t.conf, help: 'Low-confidence detections removed (MODIS under 30 %, VIIRS "low").' },
     { label: 'Away from flares and industry', value: t.mask, help: 'Removed: detections within 2 to 3 km of a cell that FIRMS ever flagged as a static source.' },
     { label: 'Not hot all year: real fires', value: t.kept, help: 'Removed: places with heat on 15 or more days spread over 8 or more calendar months.' },
@@ -283,7 +284,7 @@ function monthlyCsv() {
   const lines = ['year,month,harmonized_cell_days,likely_low,likely_high,source,modis_cell_days,viirs_cell_days,sensor_coverage,median_same_month,percentile_rank'];
   for (let m = 0; m < D.N; m++) {
     if (!Number.isFinite(D.H[m])) continue;
-    const src = D.src[m] === 'VIIRS' ? 'VIIRS_observed' : D.src[m] === 'Terra' ? 'MODIS_Terra_converted' : 'MODIS_converted';
+    const src = D.src[m] === 'VIIRS' ? (m >= D.prelimFrom ? 'VIIRS_observed_preliminary' : 'VIIRS_observed') : D.src[m] === 'Terra' ? 'MODIS_Terra_converted' : 'MODIS_converted';
     lines.push([2000 + Math.floor(m / 12), (m % 12) + 1, r(D.H[m]), r(D.lo[m]), r(D.hi[m]), src, D.M[m], m >= 144 ? D.V[m] : '', r(D.cov[m]), r(D.clim.med[m % 12]), r(D.pct[m])].join(','));
   }
   return lines.join('\n') + '\n';

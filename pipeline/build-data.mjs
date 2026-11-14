@@ -20,7 +20,9 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const country = process.argv[2];
-if (!country) { console.error('usage: node pipeline/build-data.mjs <CountryName>'); process.exit(1); }
+// last day covered by the data; default = 31 December of the newest yearly file
+const throughArg = process.argv[3];
+if (!country || (throughArg && !/^\d{4}-\d{2}-\d{2}$/.test(throughArg))) { console.error('usage: node pipeline/build-data.mjs <CountryName> [data-through YYYY-MM-DD]'); process.exit(1); }
 const RAW = path.join(ROOT, 'raw', country);
 const OUT = path.join(ROOT, 'site', 'data');
 const RES = 100;                 // cells per degree (0.01 deg ~ 1.1 km)
@@ -32,6 +34,7 @@ const K = (a, b) => (a + 9000) * 36000 + (b + 18000);
 
 const rows = [];
 const yearsBySensor = { M: new Set(), V: new Set() };
+const untypedFrom = { M: null, V: null }; // first date of near-real-time rows (no FIRMS type)
 for (const f of fs.readdirSync(RAW).sort()) {
   const m = /^(modis|viirs-snpp)_(\d{4})_/.exec(f);
   if (!m) continue;
@@ -45,11 +48,15 @@ for (const f of fs.readdirSync(RAW).sort()) {
     if (c.length < head.length) continue;
     const lat = +c[ix.latitude], lon = +c[ix.longitude];
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    if (throughArg && c[ix.acq_date] > throughArg) continue;
     const conf = c[ix.confidence];
+    if ((ix.type === undefined || c[ix.type] === '') && (!untypedFrom[sensor] || c[ix.acq_date] < untypedFrom[sensor])) untypedFrom[sensor] = c[ix.acq_date];
     rows.push({
       a: Math.floor(lat * RES), b: Math.floor(lon * RES),
       day: dayIndex(c[ix.acq_date]), month: +c[ix.acq_date].slice(5, 7), year: +c[ix.acq_date].slice(0, 4),
-      sensor, sat: c[ix.satellite], type: +c[ix.type],
+      // near-real-time rows (downloaded through the API) carry no type yet: they are treated as
+      // candidates and have to pass the static-source and persistence masks like everything else
+      sensor, sat: c[ix.satellite], type: ix.type === undefined || c[ix.type] === '' ? 0 : +c[ix.type],
       low: sensor === 'M' ? +conf < 30 : conf === 'l',
       night: c[ix.daynight] === 'N', frp: +c[ix.frp] || 0,
     });
@@ -107,6 +114,8 @@ const pack = {
   built: new Date().toISOString().slice(0, 10),
   res: RES, epoch: '2000-01-01',
   years: { modis: [Math.min(...yearsBySensor.M), Math.max(...yearsBySensor.M)], viirs: [Math.min(...yearsBySensor.V), Math.max(...yearsBySensor.V)] },
+  preliminaryFrom: untypedFrom.V, // VIIRS months from here on are near-real-time data
+  through: throughArg || `${Math.max(...yearsBySensor.M, ...yearsBySensor.V)}-12-31`,
   rules: { dilate: DILATE, persistDays: PERSIST_DAYS, persistMonths: PERSIST_MONTHS, minConfModis: 30 },
   funnel,
   // satellite outages (inclusive ISO date ranges), from pipeline/find-gaps.mjs

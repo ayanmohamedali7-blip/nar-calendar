@@ -51,7 +51,7 @@ for (const a of [{ name: 'Whole country', box: null }, ...meta.presets]) {
     const sum = { o: 0, A: 0, B: 0, Q: 0 };
     for (let c = 0; c < 12; c++) {
       const m = (y - 2000) * 12 + c;
-      if (m < ERA.VIIRS_START) continue;
+      if (m < ERA.VIIRS_START || m >= N) continue;
       const p = { A: ratio.k[c] * M[m], B: b.alpha[c] + b.beta * M[m], Q: q.map(M[m], c) };
       sum.o += V[m];
       for (const k of 'ABQ') { sum[k] += p[k]; res[k][1].push([V[m], p[k]]); }
