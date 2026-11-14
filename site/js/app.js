@@ -112,13 +112,15 @@ function renderSummary() {
   h += `<div class="stat-row"><div class="stat"><div class="k">Fire season</div><div class="v" style="font-size:19px">${season ? season.range : 'No clear season'}</div><div class="d">${season ? `Peak in ${season.peak}` : 'Fires are too rare here'}</div></div>
     <div class="stat"><div class="k">Most active year</div><div class="v" style="font-size:19px">${top.year}</div><div class="d">${fmt(top.total)} cell-days${top.observed ? '' : ' (estimated)'}</div></div></div>`;
   const e = D.cv.yearlyError;
-  const er = D.cv.yearlyErrorRatio;
+  const er = D.cv.otherError;
+  const names = { quantile: 'rank matching', ratio: 'monthly conversion factors' };
   if (D.overlap.SV < 30 || !Number.isFinite(e)) {
     // too few fires since 2012 to measure anything
     h += `<div class="stat"><div class="k">How reliable are the years before 2012?</div><div class="v" style="font-size:19px">Too few fires to measure</div>
       <div class="d">This area has only ${fmt(D.overlap.SV)} burning cell-days since 2012. Treat the years before 2012 as a rough guide, or draw a larger area.</div></div>`;
   } else {
-    const base = !Number.isFinite(er) ? '' : er > e + 0.005 ? ` Plain monthly conversion factors would miss by ±${Math.round(100 * er)} %.` : er < e - 0.005 ? ` Here plain monthly conversion factors do better (±${Math.round(100 * er)} %), so read the older years with extra care.` : ` Here plain monthly conversion factors do about as well (±${Math.round(100 * er)} %).`;
+    const otherName = names[D.cv.method === 'ratio' ? 'quantile' : 'ratio'];
+    const base = ` Method used here: ${names[D.cv.method]}${!Number.isFinite(er) ? '' : `, because it predicted the hidden years best (${otherName}: ±${Math.round(100 * er)} %)`}.`;
     h += `<div class="stat"><div class="k">How reliable are the years before 2012?</div><div class="v">±${Math.round(100 * e)} % <small>typical miss of a yearly total</small></div>
       <div class="d">Measured by hiding each year of 2012 to ${P.lastYear} and predicting it from MODIS alone.${base}${D.lowEvidence ? ' MODIS saw very few fires here, so treat the years before 2012 as a rough guide only.' : ''}</div></div>`;
   }

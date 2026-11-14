@@ -18,9 +18,9 @@ Draw any area on the map (or type its coordinates) and Nar Calendar shows:
 - any **range of years** you choose: the normal, the ranks, the trend and the downloads all follow it;
 - **downloads**: the monthly series and every fire cell as CSV, and the calendar itself as a PNG image.
 
-Country packs so far: **Libya**, where the story started (the forests of Jebel Akhdar, the Green Mountain), **Algeria**, **Egypt** and **Tunisia**. Any other country is two commands away (see "Run it").
+Country packs: **Libya**, where the story started (the forests of Jebel Akhdar, the Green Mountain), and twelve more around the Mediterranean: Algeria, Cyprus, Egypt, Greece, Italy, Lebanon, Morocco, Portugal, Spain, Syria, Tunisia and Turkey. Any other country is three commands away (see "Run it").
 
-The record matches events people remember: the Kabylie fires of August 2021 and Algeria's 2012 season stand out, and so does the autumn rice-straw burning of the Nile Delta. Validation of yearly totals (each year hidden, then predicted from MODIS alone): Algeria misses by 7 %, the Nile Delta by 9 %, Tunisia by 15 %, Libya by 19 %, Jebel Akhdar by 25 %.
+The record matches events people remember: the Kabylie fires of August 2021 and Algeria's 2012 season stand out, and so does the autumn rice-straw burning of the Nile Delta. Validation of yearly totals (each year hidden, then predicted from MODIS alone), whole countries: Italy misses by 5 %, Spain 6 %, Algeria 7 %, Portugal 7 %, Greece 8 %, Turkey 9 %, Morocco 10 %, Syria 10 %, Lebanon 13 %, Tunisia 15 %, Libya 19 %, Egypt 28 %, Cyprus 30 %.
 
 ## The problem
 
@@ -51,7 +51,7 @@ All steps are in `pipeline/build-data.mjs` (data) and `site/js/harmonize.js` (st
 | Tripoli and Jefara | miss 64 %, spread 2.71 | miss 18 %, spread 0.60 | **miss 21 %, spread 1.06** |
 | Murzuq and Sabha | miss 27 %, spread 1.55 | miss 18 %, spread 0.33 | **miss 20 %, spread 0.94** |
 
-*miss* = mean absolute error as a share of the observed total; *spread* = variability of the predictions relative to reality (1 is ideal). A single factor exaggerates every MODIS peak. Least squares has low error but flattens the record, so no early year could ever look abnormal. Quantile mapping is nearly as accurate and keeps realistic ups and downs, which is what a calendar of anomalies needs. It is not better everywhere: for Egypt as a whole and for two Tunisian areas the monthly factors do as well or better, and the app says so for the area on screen instead of claiming an improvement.
+*miss* = mean absolute error as a share of the observed total; *spread* = variability of the predictions relative to reality (1 is ideal). A single factor exaggerates every MODIS peak. Least squares has low error but flattens the record, so no early year could ever look abnormal. Quantile mapping is nearly as accurate and keeps realistic ups and downs, which is what a calendar of anomalies needs. It is not better everywhere. With thirteen countries the pattern is clear: where MODIS misses most fires (small farm fires, North Africa) rank matching wins by a wide margin, and where large forest fires dominate (Galicia, northern Portugal, Attica) plain monthly factors are sometimes better. So the app cross-validates **both** methods on the area the user draws and uses the one that predicts the hidden years best, with rank matching as the default. The summary card names the method that was used and the error of the other one.
 
 ### Limits
 
@@ -83,7 +83,7 @@ node pipeline/download-latest.mjs 2026-10-31 Libya   # months not yet in the arc
 node pipeline/find-gaps.mjs 2026-10-31   # satellite outage days (needs Algeria, Libya, Egypt in raw/)
 node pipeline/build-data.mjs Libya 2026-10-31   # writes site/data/libya.json
 node pipeline/validate.mjs libya     # prints the validation for the ready-made areas
-node --test pipeline/test.mjs pipeline/test-fixes.mjs   # 19 checks, including a recount from the raw files
+node --test pipeline/test.mjs pipeline/test-fixes.mjs   # 28 checks, including a recount from the raw files for every country
 node pipeline/serve.mjs              # http://127.0.0.1:8765/
 ```
 

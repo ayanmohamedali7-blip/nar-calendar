@@ -159,13 +159,17 @@ export function fitQuantileMap(V, X, N, skipYear = null) {
     const [xl, vl] = table[table.length - 1];
     return xl > 0 ? (vl * x) / xl : vl;
   };
-  // Two guards keep the mapping sane where the overlap holds few fires (tiny areas):
+  // Guards:
   //  - more MODIS fire never gives a lower estimate than "MODIS saw nothing" in the same month;
-  //  - VIIRS sees at least the fires MODIS sees, so the result is never below the MODIS count.
+  //  - where the overlap holds too few MODIS fires to learn a mapping (tiny areas), the result is
+  //    never below the MODIS count itself. With enough evidence the ranks decide alone, otherwise
+  //    this floor would push the totals up.
+  const weak = xs.reduce((sum, v) => sum + v, 0) < MIN_LOCAL_MODIS;
+  const floor = (x) => (weak ? x : 0);
   const map = (x, c = null) => {
     if (!table.length) return x;
-    if (x <= table[0][0]) return Math.max(x, lowest(c));
-    return Math.max(x, lowest(c), lookup(x));
+    if (x <= table[0][0]) return Math.max(floor(x), lowest(c));
+    return Math.max(floor(x), lowest(c), lookup(x));
   };
   return { map, table, seasonWeights: w };
 }
@@ -197,63 +201,71 @@ const quantile = (sorted, p) => {
   return sorted[lo] + (sorted[hi] - sorted[lo]) * (x - lo);
 };
 
+/** A conversion factor never turns a MODIS count into something smaller than itself. */
+const ratioMap = (fit) => (x, c) => Math.max(x, fit.k[c] * x);
+
 /**
- * Leave-one-year-out check: each overlap year is hidden in turn, the mapping is fitted on the
- * other years and has to predict the hidden year's VIIRS counts from MODIS alone.
+ * Leave-one-year-out check of BOTH conversion methods: each overlap year is hidden in turn, the
+ * methods are fitted on the other years and have to predict the hidden year's VIIRS counts from
+ * MODIS alone.
+ *   quantile = rank matching (fitQuantileMap)      ratio = one factor per calendar month (fitRatio)
  */
 export function crossValidate(V, X, N) {
   const years = [];
-  const resid = []; // monthly observed - predicted
-  let absM = 0;
-  let absY = 0;
-  let absYratio = 0;
+  const resid = { quantile: [], ratio: [] }; // monthly observed - predicted
+  const absY = { quantile: 0, ratio: 0 };
+  const absM = { quantile: 0, ratio: 0 };
   let sumObs = 0;
   const firstYear = 2000 + Math.floor(ERA.VIIRS_START / 12);
   for (let y = firstYear; (y - 2000) * 12 < N; y++) {
     const q = fitQuantileMap(V, X, N, y);
-    const ratio = fitRatio(V, X, N, y);
+    const r = ratioMap(fitRatio(V, X, N, y));
     let obs = 0;
-    let pred = 0;
-    let ratioPred = 0;
     let raw = 0;
+    const pred = { quantile: 0, ratio: 0 };
     for (let c = 0; c < 12; c++) {
       const m = (y - 2000) * 12 + c;
       if (m >= N) break;
       if (m < ERA.VIIRS_START) continue; // partial first VIIRS month
-      const p = q.map(X[m], c);
+      const p = { quantile: q.map(X[m], c), ratio: r(X[m], c) };
       obs += V[m];
       raw += X[m];
-      pred += p;
-      ratioPred += ratio.k[c] * X[m];
-      resid.push(V[m] - p);
-      absM += Math.abs(V[m] - p);
+      for (const k of ['quantile', 'ratio']) {
+        pred[k] += p[k];
+        resid[k].push(V[m] - p[k]);
+        absM[k] += Math.abs(V[m] - p[k]);
+      }
     }
-    years.push({ year: y, observed: obs, predicted: pred, ratioPredicted: ratioPred, modisRaw: raw });
-    absY += Math.abs(obs - pred);
-    absYratio += Math.abs(obs - ratioPred);
+    years.push({ year: y, observed: obs, quantile: pred.quantile, ratio: pred.ratio, modisRaw: raw });
+    absY.quantile += Math.abs(obs - pred.quantile);
+    absY.ratio += Math.abs(obs - pred.ratio);
     sumObs += obs;
   }
-  resid.sort((p, q) => p - q);
-  const rel = years
-    .filter((r) => r.predicted > 0)
-    .map((r) => r.observed / r.predicted)
-    .sort((p, q) => p - q);
-  return {
-    years,
-    n: years.length,
-    yearlyError: sumObs > 0 ? absY / sumObs : NaN, // weighted absolute % error of yearly totals
-    yearlyErrorRatio: sumObs > 0 ? absYratio / sumObs : NaN, // same for the single-factor baseline
-    monthlyError: sumObs > 0 ? absM / sumObs : NaN,
-    monthBand: [quantile(resid, 0.1), quantile(resid, 0.9)], // additive 80 % band for one month
-    yearBand: [quantile(rel, 0.1), quantile(rel, 0.9)], // multiplicative 80 % band for one year
-  };
+  const result = { years, n: years.length };
+  for (const k of ['quantile', 'ratio']) {
+    resid[k].sort((p, q) => p - q);
+    const rel = years.filter((r) => r[k] > 0).map((r) => r.observed / r[k]).sort((p, q) => p - q);
+    result[k] = {
+      yearlyError: sumObs > 0 ? absY[k] / sumObs : NaN, // weighted absolute % error of yearly totals
+      monthlyError: sumObs > 0 ? absM[k] / sumObs : NaN,
+      monthBand: [quantile(resid[k], 0.1), quantile(resid[k], 0.9)], // additive 80 % band for one month
+      yearBand: [quantile(rel, 0.1), quantile(rel, 0.9)], // multiplicative 80 % band for one year
+    };
+  }
+  return result;
 }
 
 /**
  * Build the harmonized monthly series for an area, in VIIRS-equivalent burning cell-days.
  *   Feb 2012 ->        : VIIRS as observed
- *   Jul 2002 - Jan 2012: MODIS Terra+Aqua, quantile-mapped to VIIRS units
- *   Nov 2000 - Jun 2002: MODIS Terra alone (Aqua not yet launched), with its own mapping
+ *   Jul 2002 - Jan 2012: MODIS Terra+Aqua, converted to VIIRS units
+ *   Nov 2000 - Jun 2002: MODIS Terra alone (Aqua not yet launched), with its own conversion
+ *
+ * METHOD SELECTION. No single conversion is best everywhere. Where MODIS misses most fires (small
+ * farm fires, North Africa) rank matching wins clearly; where large forest fires dominate
+ * (Iberia, Turkey) plain monthly factors are sometimes better. So both are cross-validated on
+ * the area itself and the one that predicts the hidden years best is used. Rank matching is the
+ * default: the factors need a clear lead (one percentage point) and enough MODIS fires.
  */
 export function harmonize(P, inside = null) {
   const c = monthlyCounts(P, inside);
@@ -283,15 +295,28 @@ export function harmonize(P, inside = null) {
   const qm = fitQuantileMap(V, M, N);
   const qt = fitQuantileMap(V, T, N);
   const overlap = fitRatio(V, M, N);
-  const cv = crossValidate(V, M, N);
-  const cvT = crossValidate(V, T, N);
+  const overlapT = fitRatio(V, T, N);
+  const cvBoth = crossValidate(V, M, N);
+  const cvTBoth = crossValidate(V, T, N);
+  // too few MODIS fires in the overlap = the conversion rests on very little evidence
+  const lowEvidence = !(overlap.SX >= MIN_LOCAL_MODIS);
+  const eq = cvBoth.quantile.yearlyError;
+  const er = cvBoth.ratio.yearlyError;
+  const method = !lowEvidence && Number.isFinite(er) && Number.isFinite(eq) && er < eq - 0.01 ? 'ratio' : 'quantile';
+  const other = method === 'ratio' ? 'quantile' : 'ratio';
+  const convM = method === 'ratio' ? ratioMap(overlap) : qm.map;
+  const convT = method === 'ratio' ? ratioMap(overlapT) : qt.map;
+  // the app reads the chosen method's numbers from cv.*; the other method is kept for comparison
+  const cv = { ...cvBoth[method], n: cvBoth.n, method, otherError: cvBoth[other].yearlyError,
+    years: cvBoth.years.map((y) => ({ year: y.year, observed: y.observed, predicted: y[method], otherPredicted: y[other], modisRaw: y.modisRaw })) };
+  const cvT = cvTBoth[method];
   const H = new Float64Array(N).fill(NaN);
   const lo = new Float64Array(N).fill(NaN);
   const hi = new Float64Array(N).fill(NaN);
   const src = new Array(N).fill('none');
-  const band = (m, v, b) => {
-    lo[m] = Math.max(0, v + (Number.isFinite(b[0]) ? b[0] : 0));
-    hi[m] = Math.max(v, v + (Number.isFinite(b[1]) ? b[1] : 0));
+  const band = (m, v, bd) => {
+    lo[m] = Math.max(0, v + (Number.isFinite(bd[0]) ? bd[0] : 0));
+    hi[m] = Math.max(v, v + (Number.isFinite(bd[1]) ? bd[1] : 0));
   };
   for (let m = ERA.TERRA_START; m < N; m++) {
     if (m >= ERA.VIIRS_START) {
@@ -299,18 +324,16 @@ export function harmonize(P, inside = null) {
       lo[m] = hi[m] = V[m];
       src[m] = 'VIIRS';
     } else if (m >= ERA.AQUA_START) {
-      H[m] = qm.map(M[m], m % 12);
+      H[m] = convM(M[m], m % 12);
       band(m, H[m], cv.monthBand);
       src[m] = 'MODIS';
     } else {
-      H[m] = qt.map(T[m], m % 12);
+      H[m] = convT(T[m], m % 12);
       band(m, H[m], cvT.monthBand);
       src[m] = 'Terra';
     }
   }
-  // too few MODIS fires in the overlap = the mapping rests on very little evidence
-  const lowEvidence = !(overlap.SX >= MIN_LOCAL_MODIS);
-  return { ...c, Va, Ma, Ta, cov, gapDays, prelimFrom: P.prelimFrom ?? Infinity, H, lo, hi, src, qm, qt, overlap, cv, cvT, lowEvidence };
+  return { ...c, Va, Ma, Ta, cov, gapDays, prelimFrom: P.prelimFrom ?? Infinity, H, lo, hi, src, qm, qt, overlap, method, cv, cvT, cvBoth, lowEvidence };
 }
 
 /** Per calendar month: median and quartiles of the harmonized series. */

@@ -1,105 +1,1171 @@
 {
-  "countries": [
+ "countries": [
+  {
+   "id": "libya",
+   "name": "Libya",
+   "file": "libya.json",
+   "presets": [
     {
-      "id": "libya",
-      "name": "Libya",
-      "file": "libya.json",
-      "presets": [
-        { "id": "jebel-akhdar", "name": "Jebel Akhdar (Green Mountain)", "box": [32.0, 20.5, 33.0, 23.2] },
-        { "id": "tripoli-jefara", "name": "Tripoli and the Jefara plain", "box": [32.2, 12.0, 33.0, 14.5] },
-        { "id": "nafusa", "name": "Nafusa Mountains", "box": [31.6, 10.8, 32.2, 13.2] },
-        { "id": "benghazi", "name": "Benghazi plain", "box": [31.5, 19.8, 32.6, 20.6] },
-        { "id": "murzuq-sabha", "name": "Murzuq and Sabha oases", "box": [25.5, 12.5, 27.6, 15.5] }
-      ],
-      "places": [
-        { "name": "Tripoli", "lat": 32.887, "lon": 13.191 },
-        { "name": "Benghazi", "lat": 32.117, "lon": 20.067 },
-        { "name": "Misrata", "lat": 32.375, "lon": 15.092 },
-        { "name": "Al Bayda", "lat": 32.763, "lon": 21.755 },
-        { "name": "Derna", "lat": 32.767, "lon": 22.639 },
-        { "name": "Tobruk", "lat": 32.084, "lon": 23.976 },
-        { "name": "Al Marj", "lat": 32.493, "lon": 20.83 },
-        { "name": "Ajdabiya", "lat": 30.755, "lon": 20.226 },
-        { "name": "Sirte", "lat": 31.205, "lon": 16.588 },
-        { "name": "Gharyan", "lat": 32.172, "lon": 13.02 },
-        { "name": "Nalut", "lat": 31.868, "lon": 10.983 },
-        { "name": "Sabha", "lat": 27.038, "lon": 14.428 },
-        { "name": "Murzuq", "lat": 25.916, "lon": 13.918 },
-        { "name": "Kufra", "lat": 24.18, "lon": 23.29 },
-        { "name": "Ghadames", "lat": 30.133, "lon": 9.5 }
-      ]
+     "id": "jebel-akhdar",
+     "name": "Jebel Akhdar (Green Mountain)",
+     "box": [
+      32,
+      20.5,
+      33,
+      23.2
+     ]
     },
     {
-      "id": "algeria",
-      "name": "Algeria",
-      "file": "algeria.json",
-      "presets": [
-        { "id": "kabylie", "name": "Kabylie (Tizi Ouzou and Bejaia)", "box": [36.3, 3.6, 36.95, 5.4] },
-        { "id": "el-tarf-annaba", "name": "El Tarf and Annaba forests", "box": [36.3, 7.2, 37.1, 8.7] },
-        { "id": "jijel-skikda", "name": "Jijel and Skikda coast", "box": [36.5, 5.5, 37.1, 7.2] },
-        { "id": "tlemcen-oran", "name": "Tlemcen and Oran hills", "box": [34.6, -2.0, 35.8, 0.2] }
-      ],
-      "places": [
-        { "name": "Algiers", "lat": 36.754, "lon": 3.059 },
-        { "name": "Oran", "lat": 35.697, "lon": -0.633 },
-        { "name": "Constantine", "lat": 36.365, "lon": 6.615 },
-        { "name": "Annaba", "lat": 36.9, "lon": 7.767 },
-        { "name": "Tizi Ouzou", "lat": 36.712, "lon": 4.046 },
-        { "name": "Bejaia", "lat": 36.756, "lon": 5.084 },
-        { "name": "Jijel", "lat": 36.82, "lon": 5.767 },
-        { "name": "Skikda", "lat": 36.876, "lon": 6.909 },
-        { "name": "El Tarf", "lat": 36.767, "lon": 8.314 },
-        { "name": "Setif", "lat": 36.191, "lon": 5.414 },
-        { "name": "Batna", "lat": 35.556, "lon": 6.174 },
-        { "name": "Tlemcen", "lat": 34.878, "lon": -1.315 },
-        { "name": "Ghardaia", "lat": 32.49, "lon": 3.67 },
-        { "name": "Hassi Messaoud", "lat": 31.68, "lon": 6.07 }
-      ]
+     "id": "tripoli-jefara",
+     "name": "Tripoli and the Jefara plain",
+     "box": [
+      32.2,
+      12,
+      33,
+      14.5
+     ]
     },
     {
-      "id": "egypt",
-      "name": "Egypt",
-      "file": "egypt.json",
-      "presets": [
-        { "id": "nile-delta", "name": "Nile Delta", "box": [30.0, 29.8, 31.6, 32.3] },
-        { "id": "upper-egypt", "name": "Upper Egypt (Qena to Aswan)", "box": [24.0, 32.2, 27.0, 33.2] },
-        { "id": "faiyum", "name": "Faiyum", "box": [29.0, 30.3, 29.7, 31.2] }
-      ],
-      "places": [
-        { "name": "Cairo", "lat": 30.044, "lon": 31.236 },
-        { "name": "Alexandria", "lat": 31.2, "lon": 29.919 },
-        { "name": "Tanta", "lat": 30.786, "lon": 31.0 },
-        { "name": "Mansoura", "lat": 31.04, "lon": 31.378 },
-        { "name": "Port Said", "lat": 31.265, "lon": 32.302 },
-        { "name": "Suez", "lat": 29.967, "lon": 32.55 },
-        { "name": "Faiyum", "lat": 29.31, "lon": 30.842 },
-        { "name": "Asyut", "lat": 27.181, "lon": 31.184 },
-        { "name": "Qena", "lat": 26.164, "lon": 32.727 },
-        { "name": "Luxor", "lat": 25.687, "lon": 32.64 },
-        { "name": "Aswan", "lat": 24.089, "lon": 32.9 }
-      ]
+     "id": "nafusa",
+     "name": "Nafusa Mountains",
+     "box": [
+      31.6,
+      10.8,
+      32.2,
+      13.2
+     ]
     },
     {
-      "id": "tunisia",
-      "name": "Tunisia",
-      "file": "tunisia.json",
-      "presets": [
-        { "id": "kroumirie", "name": "Kroumirie forests (Jendouba)", "box": [36.4, 8.2, 37.1, 9.4] },
-        { "id": "cap-bon", "name": "Cap Bon and Zaghouan", "box": [36.2, 10.0, 37.1, 11.2] },
-        { "id": "kasserine", "name": "Kasserine and Jebel Chambi", "box": [34.9, 8.2, 35.6, 9.3] }
-      ],
-      "places": [
-        { "name": "Tunis", "lat": 36.806, "lon": 10.181 },
-        { "name": "Bizerte", "lat": 37.274, "lon": 9.874 },
-        { "name": "Tabarka", "lat": 36.954, "lon": 8.758 },
-        { "name": "Jendouba", "lat": 36.501, "lon": 8.78 },
-        { "name": "Sousse", "lat": 35.825, "lon": 10.637 },
-        { "name": "Kairouan", "lat": 35.678, "lon": 10.096 },
-        { "name": "Kasserine", "lat": 35.167, "lon": 8.836 },
-        { "name": "Sfax", "lat": 34.74, "lon": 10.76 },
-        { "name": "Gabes", "lat": 33.881, "lon": 10.098 },
-        { "name": "Tozeur", "lat": 33.92, "lon": 8.133 }
-      ]
+     "id": "benghazi",
+     "name": "Benghazi plain",
+     "box": [
+      31.5,
+      19.8,
+      32.6,
+      20.6
+     ]
+    },
+    {
+     "id": "murzuq-sabha",
+     "name": "Murzuq and Sabha oases",
+     "box": [
+      25.5,
+      12.5,
+      27.6,
+      15.5
+     ]
     }
-  ]
+   ],
+   "places": [
+    {
+     "name": "Tripoli",
+     "lat": 32.887,
+     "lon": 13.191
+    },
+    {
+     "name": "Benghazi",
+     "lat": 32.117,
+     "lon": 20.067
+    },
+    {
+     "name": "Misrata",
+     "lat": 32.375,
+     "lon": 15.092
+    },
+    {
+     "name": "Al Bayda",
+     "lat": 32.763,
+     "lon": 21.755
+    },
+    {
+     "name": "Derna",
+     "lat": 32.767,
+     "lon": 22.639
+    },
+    {
+     "name": "Tobruk",
+     "lat": 32.084,
+     "lon": 23.976
+    },
+    {
+     "name": "Al Marj",
+     "lat": 32.493,
+     "lon": 20.83
+    },
+    {
+     "name": "Ajdabiya",
+     "lat": 30.755,
+     "lon": 20.226
+    },
+    {
+     "name": "Sirte",
+     "lat": 31.205,
+     "lon": 16.588
+    },
+    {
+     "name": "Gharyan",
+     "lat": 32.172,
+     "lon": 13.02
+    },
+    {
+     "name": "Nalut",
+     "lat": 31.868,
+     "lon": 10.983
+    },
+    {
+     "name": "Sabha",
+     "lat": 27.038,
+     "lon": 14.428
+    },
+    {
+     "name": "Murzuq",
+     "lat": 25.916,
+     "lon": 13.918
+    },
+    {
+     "name": "Kufra",
+     "lat": 24.18,
+     "lon": 23.29
+    },
+    {
+     "name": "Ghadames",
+     "lat": 30.133,
+     "lon": 9.5
+    }
+   ]
+  },
+  {
+   "id": "algeria",
+   "name": "Algeria",
+   "file": "algeria.json",
+   "presets": [
+    {
+     "id": "kabylie",
+     "name": "Kabylie (Tizi Ouzou and Bejaia)",
+     "box": [
+      36.3,
+      3.6,
+      36.95,
+      5.4
+     ]
+    },
+    {
+     "id": "el-tarf-annaba",
+     "name": "El Tarf and Annaba forests",
+     "box": [
+      36.3,
+      7.2,
+      37.1,
+      8.7
+     ]
+    },
+    {
+     "id": "jijel-skikda",
+     "name": "Jijel and Skikda coast",
+     "box": [
+      36.5,
+      5.5,
+      37.1,
+      7.2
+     ]
+    },
+    {
+     "id": "tlemcen-oran",
+     "name": "Tlemcen and Oran hills",
+     "box": [
+      34.6,
+      -2,
+      35.8,
+      0.2
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Algiers",
+     "lat": 36.754,
+     "lon": 3.059
+    },
+    {
+     "name": "Oran",
+     "lat": 35.697,
+     "lon": -0.633
+    },
+    {
+     "name": "Constantine",
+     "lat": 36.365,
+     "lon": 6.615
+    },
+    {
+     "name": "Annaba",
+     "lat": 36.9,
+     "lon": 7.767
+    },
+    {
+     "name": "Tizi Ouzou",
+     "lat": 36.712,
+     "lon": 4.046
+    },
+    {
+     "name": "Bejaia",
+     "lat": 36.756,
+     "lon": 5.084
+    },
+    {
+     "name": "Jijel",
+     "lat": 36.82,
+     "lon": 5.767
+    },
+    {
+     "name": "Skikda",
+     "lat": 36.876,
+     "lon": 6.909
+    },
+    {
+     "name": "El Tarf",
+     "lat": 36.767,
+     "lon": 8.314
+    },
+    {
+     "name": "Setif",
+     "lat": 36.191,
+     "lon": 5.414
+    },
+    {
+     "name": "Batna",
+     "lat": 35.556,
+     "lon": 6.174
+    },
+    {
+     "name": "Tlemcen",
+     "lat": 34.878,
+     "lon": -1.315
+    },
+    {
+     "name": "Ghardaia",
+     "lat": 32.49,
+     "lon": 3.67
+    },
+    {
+     "name": "Hassi Messaoud",
+     "lat": 31.68,
+     "lon": 6.07
+    }
+   ]
+  },
+  {
+   "id": "cyprus",
+   "name": "Cyprus",
+   "file": "cyprus.json",
+   "presets": [
+    {
+     "id": "troodos",
+     "name": "Troodos and the Limassol hills",
+     "box": [
+      34.6,
+      32.4,
+      35.1,
+      33.4
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Nicosia",
+     "lat": 35.17,
+     "lon": 33.36
+    },
+    {
+     "name": "Limassol",
+     "lat": 34.68,
+     "lon": 33.04
+    },
+    {
+     "name": "Larnaca",
+     "lat": 34.92,
+     "lon": 33.63
+    },
+    {
+     "name": "Paphos",
+     "lat": 34.77,
+     "lon": 32.42
+    },
+    {
+     "name": "Famagusta",
+     "lat": 35.12,
+     "lon": 33.94
+    },
+    {
+     "name": "Kyrenia",
+     "lat": 35.34,
+     "lon": 33.32
+    }
+   ]
+  },
+  {
+   "id": "egypt",
+   "name": "Egypt",
+   "file": "egypt.json",
+   "presets": [
+    {
+     "id": "nile-delta",
+     "name": "Nile Delta",
+     "box": [
+      30,
+      29.8,
+      31.6,
+      32.3
+     ]
+    },
+    {
+     "id": "upper-egypt",
+     "name": "Upper Egypt (Qena to Aswan)",
+     "box": [
+      24,
+      32.2,
+      27,
+      33.2
+     ]
+    },
+    {
+     "id": "faiyum",
+     "name": "Faiyum",
+     "box": [
+      29,
+      30.3,
+      29.7,
+      31.2
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Cairo",
+     "lat": 30.044,
+     "lon": 31.236
+    },
+    {
+     "name": "Alexandria",
+     "lat": 31.2,
+     "lon": 29.919
+    },
+    {
+     "name": "Tanta",
+     "lat": 30.786,
+     "lon": 31
+    },
+    {
+     "name": "Mansoura",
+     "lat": 31.04,
+     "lon": 31.378
+    },
+    {
+     "name": "Port Said",
+     "lat": 31.265,
+     "lon": 32.302
+    },
+    {
+     "name": "Suez",
+     "lat": 29.967,
+     "lon": 32.55
+    },
+    {
+     "name": "Faiyum",
+     "lat": 29.31,
+     "lon": 30.842
+    },
+    {
+     "name": "Asyut",
+     "lat": 27.181,
+     "lon": 31.184
+    },
+    {
+     "name": "Qena",
+     "lat": 26.164,
+     "lon": 32.727
+    },
+    {
+     "name": "Luxor",
+     "lat": 25.687,
+     "lon": 32.64
+    },
+    {
+     "name": "Aswan",
+     "lat": 24.089,
+     "lon": 32.9
+    }
+   ]
+  },
+  {
+   "id": "greece",
+   "name": "Greece",
+   "file": "greece.json",
+   "presets": [
+    {
+     "id": "attica-evia",
+     "name": "Attica and Evia",
+     "box": [
+      37.6,
+      23,
+      39.1,
+      24.7
+     ]
+    },
+    {
+     "id": "peloponnese",
+     "name": "Peloponnese",
+     "box": [
+      36.4,
+      21.1,
+      38.4,
+      23.3
+     ]
+    },
+    {
+     "id": "evros",
+     "name": "Evros and Rhodope (Dadia forest)",
+     "box": [
+      40.7,
+      25,
+      41.8,
+      26.7
+     ]
+    },
+    {
+     "id": "rhodes",
+     "name": "Rhodes",
+     "box": [
+      35.85,
+      27.65,
+      36.5,
+      28.3
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Athens",
+     "lat": 37.98,
+     "lon": 23.73
+    },
+    {
+     "name": "Thessaloniki",
+     "lat": 40.64,
+     "lon": 22.94
+    },
+    {
+     "name": "Larissa",
+     "lat": 39.64,
+     "lon": 22.42
+    },
+    {
+     "name": "Patras",
+     "lat": 38.25,
+     "lon": 21.73
+    },
+    {
+     "name": "Chalkida",
+     "lat": 38.46,
+     "lon": 23.6
+    },
+    {
+     "name": "Kalamata",
+     "lat": 37.04,
+     "lon": 22.11
+    },
+    {
+     "name": "Alexandroupoli",
+     "lat": 40.85,
+     "lon": 25.87
+    },
+    {
+     "name": "Heraklion",
+     "lat": 35.34,
+     "lon": 25.13
+    },
+    {
+     "name": "Rhodes",
+     "lat": 36.43,
+     "lon": 28.22
+    }
+   ]
+  },
+  {
+   "id": "italy",
+   "name": "Italy",
+   "file": "italy.json",
+   "presets": [
+    {
+     "id": "sicily",
+     "name": "Sicily",
+     "box": [
+      36.6,
+      12.3,
+      38.4,
+      15.7
+     ]
+    },
+    {
+     "id": "sardinia",
+     "name": "Sardinia",
+     "box": [
+      38.8,
+      8.1,
+      41.3,
+      9.9
+     ]
+    },
+    {
+     "id": "calabria",
+     "name": "Calabria",
+     "box": [
+      37.9,
+      15.6,
+      40.2,
+      17.3
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Rome",
+     "lat": 41.9,
+     "lon": 12.5
+    },
+    {
+     "name": "Milan",
+     "lat": 45.46,
+     "lon": 9.19
+    },
+    {
+     "name": "Turin",
+     "lat": 45.07,
+     "lon": 7.69
+    },
+    {
+     "name": "Florence",
+     "lat": 43.77,
+     "lon": 11.26
+    },
+    {
+     "name": "Naples",
+     "lat": 40.85,
+     "lon": 14.27
+    },
+    {
+     "name": "Bari",
+     "lat": 41.12,
+     "lon": 16.87
+    },
+    {
+     "name": "Reggio Calabria",
+     "lat": 38.11,
+     "lon": 15.65
+    },
+    {
+     "name": "Palermo",
+     "lat": 38.12,
+     "lon": 13.36
+    },
+    {
+     "name": "Catania",
+     "lat": 37.5,
+     "lon": 15.09
+    },
+    {
+     "name": "Cagliari",
+     "lat": 39.22,
+     "lon": 9.12
+    }
+   ]
+  },
+  {
+   "id": "lebanon",
+   "name": "Lebanon",
+   "file": "lebanon.json",
+   "presets": [
+    {
+     "id": "mount-lebanon",
+     "name": "Mount Lebanon and Chouf",
+     "box": [
+      33.5,
+      35.3,
+      34.2,
+      36
+     ]
+    },
+    {
+     "id": "akkar",
+     "name": "Akkar and the north",
+     "box": [
+      34.3,
+      35.8,
+      34.7,
+      36.5
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Beirut",
+     "lat": 33.89,
+     "lon": 35.5
+    },
+    {
+     "name": "Tripoli",
+     "lat": 34.44,
+     "lon": 35.84
+    },
+    {
+     "name": "Sidon",
+     "lat": 33.56,
+     "lon": 35.37
+    },
+    {
+     "name": "Tyre",
+     "lat": 33.27,
+     "lon": 35.2
+    },
+    {
+     "name": "Zahle",
+     "lat": 33.85,
+     "lon": 35.9
+    },
+    {
+     "name": "Baalbek",
+     "lat": 34,
+     "lon": 36.21
+    }
+   ]
+  },
+  {
+   "id": "morocco",
+   "name": "Morocco",
+   "file": "morocco.json",
+   "presets": [
+    {
+     "id": "rif",
+     "name": "Rif mountains (Chefchaouen and Tetouan)",
+     "box": [
+      34.7,
+      -5.9,
+      35.6,
+      -4
+     ]
+    },
+    {
+     "id": "middle-atlas",
+     "name": "Middle Atlas (Ifrane and Khenifra)",
+     "box": [
+      32.6,
+      -6,
+      33.9,
+      -4.6
+     ]
+    },
+    {
+     "id": "gharb",
+     "name": "Gharb plain (Kenitra)",
+     "box": [
+      34,
+      -6.8,
+      34.9,
+      -5.7
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Rabat",
+     "lat": 34.02,
+     "lon": -6.84
+    },
+    {
+     "name": "Casablanca",
+     "lat": 33.57,
+     "lon": -7.59
+    },
+    {
+     "name": "Fes",
+     "lat": 34.03,
+     "lon": -5
+    },
+    {
+     "name": "Tangier",
+     "lat": 35.76,
+     "lon": -5.83
+    },
+    {
+     "name": "Tetouan",
+     "lat": 35.57,
+     "lon": -5.37
+    },
+    {
+     "name": "Chefchaouen",
+     "lat": 35.17,
+     "lon": -5.27
+    },
+    {
+     "name": "Marrakech",
+     "lat": 31.63,
+     "lon": -8
+    },
+    {
+     "name": "Agadir",
+     "lat": 30.42,
+     "lon": -9.6
+    },
+    {
+     "name": "Oujda",
+     "lat": 34.68,
+     "lon": -1.9
+    }
+   ]
+  },
+  {
+   "id": "portugal",
+   "name": "Portugal",
+   "file": "portugal.json",
+   "presets": [
+    {
+     "id": "central",
+     "name": "Central Portugal (Coimbra and Pedrogao Grande)",
+     "box": [
+      39.6,
+      -8.7,
+      40.6,
+      -7.4
+     ]
+    },
+    {
+     "id": "north",
+     "name": "Northern Portugal (Braga and Vila Real)",
+     "box": [
+      41.2,
+      -8.7,
+      42,
+      -7
+     ]
+    },
+    {
+     "id": "algarve",
+     "name": "Algarve and Monchique",
+     "box": [
+      37,
+      -9,
+      37.5,
+      -7.4
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Lisbon",
+     "lat": 38.72,
+     "lon": -9.14
+    },
+    {
+     "name": "Porto",
+     "lat": 41.15,
+     "lon": -8.61
+    },
+    {
+     "name": "Coimbra",
+     "lat": 40.21,
+     "lon": -8.43
+    },
+    {
+     "name": "Braga",
+     "lat": 41.55,
+     "lon": -8.42
+    },
+    {
+     "name": "Viseu",
+     "lat": 40.66,
+     "lon": -7.91
+    },
+    {
+     "name": "Evora",
+     "lat": 38.57,
+     "lon": -7.91
+    },
+    {
+     "name": "Faro",
+     "lat": 37.02,
+     "lon": -7.93
+    }
+   ]
+  },
+  {
+   "id": "spain",
+   "name": "Spain",
+   "file": "spain.json",
+   "presets": [
+    {
+     "id": "galicia",
+     "name": "Galicia",
+     "box": [
+      41.8,
+      -9.3,
+      43.8,
+      -6.7
+     ]
+    },
+    {
+     "id": "zamora",
+     "name": "Zamora and Sierra de la Culebra",
+     "box": [
+      41.6,
+      -6.9,
+      42.3,
+      -5.6
+     ]
+    },
+    {
+     "id": "valencia",
+     "name": "Valencia region",
+     "box": [
+      38.6,
+      -1.6,
+      40.6,
+      0.3
+     ]
+    },
+    {
+     "id": "andalusia-west",
+     "name": "Western Andalusia (Huelva and Seville)",
+     "box": [
+      36.9,
+      -7.5,
+      38.2,
+      -5
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Madrid",
+     "lat": 40.42,
+     "lon": -3.7
+    },
+    {
+     "name": "Barcelona",
+     "lat": 41.39,
+     "lon": 2.17
+    },
+    {
+     "name": "Valencia",
+     "lat": 39.47,
+     "lon": -0.38
+    },
+    {
+     "name": "Seville",
+     "lat": 37.39,
+     "lon": -5.98
+    },
+    {
+     "name": "Zaragoza",
+     "lat": 41.65,
+     "lon": -0.89
+    },
+    {
+     "name": "Malaga",
+     "lat": 36.72,
+     "lon": -4.42
+    },
+    {
+     "name": "Bilbao",
+     "lat": 43.26,
+     "lon": -2.93
+    },
+    {
+     "name": "A Coruna",
+     "lat": 43.36,
+     "lon": -8.41
+    },
+    {
+     "name": "Vigo",
+     "lat": 42.24,
+     "lon": -8.72
+    },
+    {
+     "name": "Zamora",
+     "lat": 41.5,
+     "lon": -5.74
+    }
+   ]
+  },
+  {
+   "id": "syria",
+   "name": "Syria",
+   "file": "syria.json",
+   "presets": [
+    {
+     "id": "latakia",
+     "name": "Latakia coast mountains",
+     "box": [
+      35.2,
+      35.7,
+      36,
+      36.4
+     ]
+    },
+    {
+     "id": "ghab",
+     "name": "Al-Ghab plain and Hama",
+     "box": [
+      35,
+      36.1,
+      35.9,
+      36.9
+     ]
+    },
+    {
+     "id": "jazira",
+     "name": "Jazira farmland (Hasakah)",
+     "box": [
+      36.2,
+      39.8,
+      37.2,
+      42.3
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Damascus",
+     "lat": 33.51,
+     "lon": 36.29
+    },
+    {
+     "name": "Aleppo",
+     "lat": 36.2,
+     "lon": 37.16
+    },
+    {
+     "name": "Homs",
+     "lat": 34.73,
+     "lon": 36.72
+    },
+    {
+     "name": "Hama",
+     "lat": 35.13,
+     "lon": 36.75
+    },
+    {
+     "name": "Latakia",
+     "lat": 35.52,
+     "lon": 35.78
+    },
+    {
+     "name": "Tartus",
+     "lat": 34.89,
+     "lon": 35.89
+    },
+    {
+     "name": "Raqqa",
+     "lat": 35.95,
+     "lon": 39.01
+    },
+    {
+     "name": "Hasakah",
+     "lat": 36.5,
+     "lon": 40.75
+    },
+    {
+     "name": "Deir ez-Zor",
+     "lat": 35.33,
+     "lon": 40.14
+    }
+   ]
+  },
+  {
+   "id": "tunisia",
+   "name": "Tunisia",
+   "file": "tunisia.json",
+   "presets": [
+    {
+     "id": "kroumirie",
+     "name": "Kroumirie forests (Jendouba)",
+     "box": [
+      36.4,
+      8.2,
+      37.1,
+      9.4
+     ]
+    },
+    {
+     "id": "cap-bon",
+     "name": "Cap Bon and Zaghouan",
+     "box": [
+      36.2,
+      10,
+      37.1,
+      11.2
+     ]
+    },
+    {
+     "id": "kasserine",
+     "name": "Kasserine and Jebel Chambi",
+     "box": [
+      34.9,
+      8.2,
+      35.6,
+      9.3
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Tunis",
+     "lat": 36.806,
+     "lon": 10.181
+    },
+    {
+     "name": "Bizerte",
+     "lat": 37.274,
+     "lon": 9.874
+    },
+    {
+     "name": "Tabarka",
+     "lat": 36.954,
+     "lon": 8.758
+    },
+    {
+     "name": "Jendouba",
+     "lat": 36.501,
+     "lon": 8.78
+    },
+    {
+     "name": "Sousse",
+     "lat": 35.825,
+     "lon": 10.637
+    },
+    {
+     "name": "Kairouan",
+     "lat": 35.678,
+     "lon": 10.096
+    },
+    {
+     "name": "Kasserine",
+     "lat": 35.167,
+     "lon": 8.836
+    },
+    {
+     "name": "Sfax",
+     "lat": 34.74,
+     "lon": 10.76
+    },
+    {
+     "name": "Gabes",
+     "lat": 33.881,
+     "lon": 10.098
+    },
+    {
+     "name": "Tozeur",
+     "lat": 33.92,
+     "lon": 8.133
+    }
+   ]
+  },
+  {
+   "id": "turkey",
+   "name": "Turkey",
+   "file": "turkey.json",
+   "presets": [
+    {
+     "id": "antalya-mugla",
+     "name": "Antalya and Mugla coast",
+     "box": [
+      36.2,
+      27.3,
+      37.6,
+      32.2
+     ]
+    },
+    {
+     "id": "izmir-manisa",
+     "name": "Izmir and Manisa",
+     "box": [
+      37.9,
+      26.2,
+      39.4,
+      28.6
+     ]
+    },
+    {
+     "id": "hatay-adana",
+     "name": "Hatay and Adana",
+     "box": [
+      36,
+      35,
+      37.6,
+      36.9
+     ]
+    },
+    {
+     "id": "southeast",
+     "name": "Southeast farmland (Sanliurfa and Diyarbakir)",
+     "box": [
+      36.7,
+      38,
+      38.3,
+      41.2
+     ]
+    }
+   ],
+   "places": [
+    {
+     "name": "Ankara",
+     "lat": 39.93,
+     "lon": 32.86
+    },
+    {
+     "name": "Istanbul",
+     "lat": 41.01,
+     "lon": 28.98
+    },
+    {
+     "name": "Bursa",
+     "lat": 40.19,
+     "lon": 29.06
+    },
+    {
+     "name": "Izmir",
+     "lat": 38.42,
+     "lon": 27.14
+    },
+    {
+     "name": "Mugla",
+     "lat": 37.22,
+     "lon": 28.36
+    },
+    {
+     "name": "Antalya",
+     "lat": 36.9,
+     "lon": 30.7
+    },
+    {
+     "name": "Adana",
+     "lat": 37,
+     "lon": 35.32
+    },
+    {
+     "name": "Sanliurfa",
+     "lat": 37.16,
+     "lon": 38.79
+    },
+    {
+     "name": "Diyarbakir",
+     "lat": 37.91,
+     "lon": 40.24
+    },
+    {
+     "name": "Trabzon",
+     "lat": 41,
+     "lon": 39.72
+    }
+   ]
+  }
+ ]
 }

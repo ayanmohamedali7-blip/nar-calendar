@@ -96,8 +96,9 @@ export function createMap(el, { onArea, onDrawState }) {
         const la = P.a[i] / P.res + half, lo = P.b[i] / P.res + half;
         if (vis(la, lo)) dot(ctx, m, la, lo, pass === 2 ? r + 1.5 : r);
       }
-      if (pass === 0) { ctx.fillStyle = 'rgba(240, 138, 60, 0.28)'; ctx.fill(); }
-      if (pass === 1) { ctx.fillStyle = 'rgba(255, 122, 26, 0.85)'; ctx.fill(); }
+      // dense areas: more transparent dots, so that repeated burning shows as brighter patches
+      if (pass === 0) { ctx.fillStyle = `rgba(240, 138, 60, ${Math.max(0.08, Math.min(0.28, 2500 / P.n))})`; ctx.fill(); }
+      if (pass === 1) { ctx.fillStyle = `rgba(255, 122, 26, ${Math.max(0.22, Math.min(0.85, 2500 / Math.max(1, idx.length)))})`; ctx.fill(); }
       if (pass === 2) { ctx.fillStyle = '#fff3b0'; ctx.fill(); ctx.lineWidth = 1.5; ctx.strokeStyle = '#7a2a00'; ctx.stroke(); }
     }
   });

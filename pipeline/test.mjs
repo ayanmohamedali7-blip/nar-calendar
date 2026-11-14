@@ -133,7 +133,8 @@ test('degenerate areas do not produce NaN or throw', () => {
   for (let m = ERA.TERRA_START; m < h.N; m++) assert.ok(Number.isFinite(h.H[m]) && Number.isFinite(h.lo[m]) && Number.isFinite(h.hi[m]));
   assert.ok(h.lowEvidence);
   const cv = crossValidate(h.V, h.M, h.N);
-  assert.ok(cv.years.every((y) => Number.isFinite(y.predicted)));
+  assert.ok(cv.years.every((y) => Number.isFinite(y.quantile) && Number.isFinite(y.ratio)));
+  assert.ok(h.cv.years.every((y) => Number.isFinite(y.predicted)));
 });
 
 test('climatology and percentile rank', () => {

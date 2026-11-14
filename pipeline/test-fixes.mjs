@@ -27,11 +27,12 @@ function randomBoxes(P, count) {
   return out;
 }
 
-test('an estimate is never below what MODIS itself saw, and tiny areas are not wiped to zero', () => {
+test('where evidence is thin an estimate is never below what MODIS itself saw, and tiny areas are not wiped to zero', () => {
   for (const c of index.countries) {
     const P = packs[c.id];
     for (const box of randomBoxes(P, 150)) {
       const h = harmonize(P, inBox(...box));
+      if (!h.lowEvidence) continue; // with enough overlap evidence the ranks decide alone
       for (let m = ERA.TERRA_START; m < ERA.VIIRS_START; m++) {
         const x = m >= ERA.AQUA_START ? h.Ma[m] : h.Ta[m];
         assert.ok(h.H[m] >= x - 1e-9, `${c.id} box ${box.map((v) => v.toFixed(2))} m=${m}: H ${h.H[m]} < MODIS ${x}`);
